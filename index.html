@@ -153,6 +153,7 @@
   .download-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
   .download-card { padding: 22px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); display: flex; justify-content: space-between; align-items: center; background: var(--paper-deep); }
   .download-card:hover { color: var(--ink); border-color: var(--accent); background: #e1d8ce; }
+  .download-note { margin-top: 16px; font-size: 13px; color: var(--muted); }
   .platform { font-weight: 700; }
   .format { color: var(--accent); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 0.76rem; }
 
@@ -206,7 +207,7 @@
       <h1 data-en-html="Writing should feel<br><em>this simple.</em>" data-zh-html="写作本该<br><em>如此简单</em>">Writing should feel<br><em>this simple.</em></h1>
       <div class="subtitle" data-en="A free, elegant Markdown editor anyone can pick up." data-zh="免费、优雅，谁都能上手的 Markdown 编辑器。">A free, elegant Markdown editor anyone can pick up.</div>
       <p class="desc" data-en="Markdown is the common language of writing, notes and documentation. ColaMD gives it a quiet home: a title bar, your text and a file list, with no toolbar and nothing to configure. Whatever writes the file, the editor always shows the newest content." data-zh="Markdown 已经成为写作、记录和文档的共同语言。ColaMD 给它一个安静的所在：只有标题栏、你的文字和文件列表，没有工具栏，也不需要配置。无论是什么在写这个文件，编辑器里永远是最新的内容。">Markdown is the common language of writing, notes and documentation. ColaMD gives it a quiet home: a title bar, your text and a file list, with no toolbar and nothing to configure. Whatever writes the file, the editor always shows the newest content.</p>
-      <div class="actions"><a href="https://github.com/marswaveai/ColaMD/releases" class="btn-primary" data-en="Download for free" data-zh="免费下载">Download for free</a><a href="https://github.com/marswaveai/ColaMD" class="btn-ghost" data-en="View on GitHub" data-zh="查看 GitHub">View on GitHub</a></div>
+      <div class="actions"><a href="#download" class="btn-primary" data-en="Download for free" data-zh="免费下载">Download for free</a><a href="https://github.com/marswaveai/ColaMD" class="btn-ghost" data-en="View on GitHub" data-zh="查看 GitHub">View on GitHub</a></div>
       <div class="hero-meta" data-en="macOS · Windows · Linux · MIT License" data-zh="macOS · Windows · Linux · MIT 协议">macOS · Windows · Linux · MIT License</div>
     </div>
 
@@ -253,7 +254,7 @@
 
   <section class="download" id="download">
     <div class="download-head"><h2 data-en="Download ColaMD" data-zh="下载 ColaMD">Download ColaMD</h2></div>
-    <div class="download-grid"><a href="https://github.com/marswaveai/ColaMD/releases" class="download-card"><span class="platform">macOS</span><span class="format">.dmg</span></a><a href="https://github.com/marswaveai/ColaMD/releases" class="download-card"><span class="platform">Windows</span><span class="format">.exe</span></a><a href="https://github.com/marswaveai/ColaMD/releases" class="download-card"><span class="platform">Linux</span><span class="format">.AppImage / .deb</span></a></div>
+    <div class="download-grid"><a href="https://github.com/marswaveai/ColaMD/releases" class="download-card" data-asset="mac-arm"><span class="platform">macOS</span><span class="format" data-en="Apple silicon · .dmg" data-zh="Apple 芯片 · .dmg">Apple silicon · .dmg</span></a><a href="https://github.com/marswaveai/ColaMD/releases" class="download-card" data-asset="win-setup"><span class="platform">Windows</span><span class="format" data-en="Installer .exe" data-zh="安装版 .exe">Installer .exe</span></a><a href="https://github.com/marswaveai/ColaMD/releases" class="download-card" data-asset="linux-appimage"><span class="platform">Linux</span><span class="format">.AppImage / .deb</span></a></div><p class="download-note" data-en-html="On an older Intel Mac, <a href=&quot;https://github.com/marswaveai/ColaMD/releases&quot; data-asset=&quot;mac-intel&quot;>download the Intel build</a>. On Windows you can also grab the <a href=&quot;https://github.com/marswaveai/ColaMD/releases&quot; data-asset=&quot;win-zip&quot;>no-install zip</a>." data-zh-html="老款 Intel 芯片 Mac 请<a href=&quot;https://github.com/marswaveai/ColaMD/releases&quot; data-asset=&quot;mac-intel&quot;>下载 Intel 版</a>。Windows 另提供<a href=&quot;https://github.com/marswaveai/ColaMD/releases&quot; data-asset=&quot;win-zip&quot;>免安装 zip 版</a>。">On an older Intel Mac, <a href="https://github.com/marswaveai/ColaMD/releases" data-asset="mac-intel">download the Intel build</a>. On Windows you can also grab the <a href="https://github.com/marswaveai/ColaMD/releases" data-asset="win-zip">no-install zip</a>.</p>
   </section>
 
   <footer><span data-en-html="ColaMD is built by <a href=&quot;https://cola.app&quot;>Cola.app</a> and maintained by <a href=&quot;https://github.com/orange2ai&quot;>orange2ai</a>" data-zh-html="ColaMD 由 <a href=&quot;https://cola.app&quot;>Cola.app</a> 开发，作者 <a href=&quot;https://github.com/orange2ai&quot;>orange2ai</a>">ColaMD is built by <a href="https://cola.app">Cola.app</a> and maintained by <a href="https://github.com/orange2ai">orange2ai</a></span><div class="footer-links"><a href="https://github.com/marswaveai/ColaMD">GitHub</a><a href="https://github.com/marswaveai/ColaMD/releases" data-en="Releases" data-zh="下载">Releases</a></div></footer>
@@ -285,5 +286,35 @@
     toggle.addEventListener('click', () => setLanguage(document.documentElement.lang === 'zh-CN' ? 'en' : 'zh'));
   })();
 </script>
+  <script>
+    // Point the download cards straight at the current release assets. Asset names
+    // carry the version, so resolving them here keeps the page correct across
+    // releases; if the API call fails the links fall back to the releases page.
+    (function () {
+      var wanted = {
+        'mac-arm': /-arm64\.dmg$/,
+        'mac-intel': /-x64\.dmg$/,
+        'win-setup': /Setup-.*\.exe$/,
+        'win-zip': /-win-x64\.zip$/,
+        'linux-appimage': /\.AppImage$/,
+        'linux-deb': /\.deb$/
+      };
+      fetch('https://api.github.com/repos/marswaveai/ColaMD/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+        .then(function (response) { return response.ok ? response.json() : null })
+        .then(function (release) {
+          if (!release || !release.assets) return;
+          Object.keys(wanted).forEach(function (key) {
+            var url = null;
+            release.assets.forEach(function (asset) {
+              if (!url && wanted[key].test(asset.name)) url = asset.browser_download_url;
+            });
+            if (!url) return;
+            var nodes = document.querySelectorAll('[data-asset="' + key + '"]');
+            for (var i = 0; i < nodes.length; i++) nodes[i].setAttribute('href', url);
+          });
+        })
+        .catch(function () {});
+    })();
+  </script>
 </body>
 </html>
