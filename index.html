@@ -71,7 +71,7 @@
   .language-toggle { cursor: pointer; border: 0; background: transparent; padding: 0; }
   .language-toggle:hover { color: var(--accent); }
 
-  .hero { min-height: 680px; padding: 102px 0 116px; display: grid; grid-template-columns: minmax(300px, 0.85fr) minmax(450px, 1.15fr); gap: 70px; align-items: center; }
+  .hero { min-height: 680px; padding: 102px 0 116px; display: grid; grid-template-columns: minmax(280px, 0.85fr) minmax(400px, 1.15fr); gap: 70px; align-items: center; }
   .kicker, .eyebrow { color: var(--accent); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
   .hero h1 { margin-top: 22px; font-size: clamp(3.6rem, 6vw, 6.2rem); font-weight: 700; letter-spacing: -0.075em; line-height: 1.22; }
   .hero h1 em, .manifesto h2 em { color: var(--accent); font-style: normal; }
@@ -175,6 +175,8 @@
     .container { padding: 0 30px; }
     .hero { grid-template-columns: 1fr; gap: 50px; padding: 82px 0 92px; }
     .editor-window { max-width: 620px; width: 100%; justify-self: center; transform: rotate(1.2deg); }
+    /* 窄屏时装饰框少伸出去一点：它原本向右伸出 18px，叠上旋转会顶出屏幕，让整页能左右晃动 */
+    .editor-window::before { inset: 24px -6px -22px 22px; }
     .manifesto .copy { gap: 36px; }
     .theme-grid { grid-template-columns: repeat(3, 1fr); }
   }
