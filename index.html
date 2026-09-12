@@ -341,7 +341,10 @@
         .catch(function () {});
 
       var toggle = document.getElementById('language-toggle');
-      if (toggle) toggle.addEventListener('click', function () { setTimeout(apply, 0); });
+      // Apply synchronously and once more on the next frame: the site's own
+      // handler rewrites the paragraphs that hold these links, and listener
+      // order decides which of the two runs first.
+      if (toggle) toggle.addEventListener('click', function () { apply(); setTimeout(apply, 50); });
     })();
   </script>
 </body>
