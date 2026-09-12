@@ -300,9 +300,11 @@
   })();
 </script>
   <script>
-    // Point the download cards straight at the current release assets. Asset names
-    // carry the version, so resolving them here keeps the page correct across
-    // releases; if the API call fails the links fall back to the releases page.
+    // Point the download links straight at the current release assets. Asset
+    // names carry the version, so resolving them here keeps the page correct
+    // across releases; if the API call fails the links stay on the releases
+    // page. Applying is separate from fetching because the language switch
+    // rewrites the paragraphs that hold these links.
     (function () {
       var wanted = {
         'mac-arm': /-arm64\.dmg$/,
@@ -312,21 +314,34 @@
         'linux-appimage': /\.AppImage$/,
         'linux-deb': /\.deb$/
       };
+      var resolved = null;
+
+      function apply() {
+        if (!resolved) return;
+        Object.keys(resolved).forEach(function (key) {
+          var nodes = document.querySelectorAll('[data-asset="' + key + '"]');
+          for (var i = 0; i < nodes.length; i++) nodes[i].setAttribute('href', resolved[key]);
+        });
+      }
+
       fetch('https://api.github.com/repos/marswaveai/ColaMD/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
         .then(function (response) { return response.ok ? response.json() : null })
         .then(function (release) {
           if (!release || !release.assets) return;
+          resolved = {};
           Object.keys(wanted).forEach(function (key) {
             var url = null;
             release.assets.forEach(function (asset) {
               if (!url && wanted[key].test(asset.name)) url = asset.browser_download_url;
             });
-            if (!url) return;
-            var nodes = document.querySelectorAll('[data-asset="' + key + '"]');
-            for (var i = 0; i < nodes.length; i++) nodes[i].setAttribute('href', url);
+            if (url) resolved[key] = url;
           });
+          apply();
         })
         .catch(function () {});
+
+      var toggle = document.getElementById('language-toggle');
+      if (toggle) toggle.addEventListener('click', function () { setTimeout(apply, 0); });
     })();
   </script>
 </body>
