@@ -177,8 +177,8 @@
     .hero { grid-template-columns: 1fr; gap: 50px; padding: 82px 0 92px; }
     .editor-window { max-width: 620px; width: 100%; justify-self: center; transform: rotate(1.2deg); }
     /* 窄屏时装饰框少伸出去一点：它原本向右伸出 18px，叠上旋转会顶出屏幕，让整页能左右晃动。
-       收到 6px 时仍差 2px（375→377、320→325），这里收到 3px 才彻底不越界。 */
-    .editor-window::before { inset: 24px -3px -22px 22px; }
+       18px → 6px → 3px 都还差一点（6px 时 375 溢 2px；3px 时 320 溢 2px），收到 1px 才彻底归零。 */
+    .editor-window::before { inset: 24px -1px -22px 22px; }
     .manifesto .copy { gap: 36px; }
     .theme-grid { grid-template-columns: repeat(3, 1fr); }
   }
