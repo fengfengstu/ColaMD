@@ -124,7 +124,8 @@
   .manifesto .copy { max-width: 900px; margin-top: 52px; display: grid; grid-template-columns: 1fr 1fr; gap: 70px; color: var(--muted); font-size: 1.02rem; line-height: 1.9; }
   .manifesto .copy p + p { margin-top: 0; }
   .markdown-why h2 { font-size: clamp(1.7rem, 3.4vw, 3rem); }
-  .markdown-why .copy { margin-top: 38px; }
+  .markdown-why .copy { margin-top: 38px; grid-template-columns: repeat(3, 1fr); gap: 44px; }
+  .markdown-why .copy strong { color: var(--ink); }
 
   .features { padding: 80px 0 94px; }
   .features-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 38px; }
@@ -231,13 +232,12 @@
   </section>
 
   <section class="manifesto markdown-why" id="markdown">
-    <div class="eyebrow" data-en="Why Markdown" data-zh="为什么是 Markdown">Why Markdown</div>
-    <h2 data-en-html="A plain format <em>nothing can lock away.</em>" data-zh-html="一种<em>谁也锁不住</em>的写作格式。">A plain format <em>nothing can lock away.</em></h2>
+    <div class="eyebrow" data-en="Three reasons" data-zh="三个理由">Three reasons</div>
+    <h2 data-en="Why Markdown" data-zh="为什么 Markdown">Why Markdown</h2>
     <div class="copy">
-      <p data-en-html="A Markdown file is just text. Any system, any editor and any year can open it, so the file outlives whichever app you happened to write it in. Type <span class=&quot;source&quot;>## Today</span> and it becomes a heading; type <span class=&quot;source&quot;>- coffee</span> and it becomes a list." data-zh-html="Markdown 文件就是纯文本。任何系统、任何编辑器、十年后都能打开，所以文件比你当初写它的那个软件活得更久。写下 <span class=&quot;source&quot;>## 今日待办</span>，它就是标题；写下 <span class=&quot;source&quot;>- 买咖啡</span>，它就是一条列表。">A Markdown file is just text. Any system, any editor and any year can open it, so the file outlives whichever app you happened to write it in.</p>
-      <p data-en="Every tool speaks it: note apps, blogs, GitHub and AI assistants all read and write Markdown. Your writing does not have to move house, and it never gets locked inside one app." data-zh="所有工具都认它：笔记软件、博客、GitHub、AI 助手都能读写 Markdown。你的内容不用搬家，也不会被锁在某一个 App 里。">Every tool speaks it: note apps, blogs, GitHub and AI assistants all read and write Markdown.</p>
-      <p data-en="It asks the least of you: no buttons to hunt for. A few symbols carry headings, lists and emphasis, so your hands stay on the keyboard and your attention stays on the words." data-zh="写起来最省事：不用去找按钮调格式，几个符号就够。手不离键盘，注意力留在文字上。">It asks the least of you: no buttons to hunt for.</p>
-      <p data-en="That is why ColaMD is built on it. Open the app and write: the file on disk is always the newest version, and the format stays yours." data-zh="ColaMD 就建在这上面：打开就能写，磁盘上的文件永远是最新的，格式永远是你自己的。">That is why ColaMD is built on it.</p>
+      <p data-en-html="<strong>Universal.</strong> Note apps, blogs, GitHub and AI assistants all read and write Markdown. Any system, any editor and any year can open the file, so your writing never gets locked inside one app. Type <span class=&quot;source&quot;>## Today</span> for a heading, <span class=&quot;source&quot;>- coffee</span> for a list." data-zh-html="<strong>通用。</strong>笔记软件、博客、GitHub、AI 助手都能读写 Markdown，任何系统、任何编辑器、十年后都能打开。你的内容不用搬家，也不会被锁在某个 App 里。写下 <span class=&quot;source&quot;>## 今日待办</span> 它就是标题，写下 <span class=&quot;source&quot;>- 买咖啡</span> 它就是一条列表。"><strong>Universal.</strong> Note apps, blogs, GitHub and AI assistants all read and write Markdown. Any system, any editor and any year can open the file, so your writing never gets locked inside one app.</p>
+      <p data-en-html="<strong>Effortless.</strong> Nothing to configure, no buttons to hunt for: <span class=&quot;source&quot;>##</span> makes a heading, <span class=&quot;source&quot;>-</span> makes a list, <span class=&quot;source&quot;>**</span> makes bold. What you type is what the document looks like, so there is no preview to check against." data-zh-html="<strong>省事。</strong>不用去找按钮调格式，几个符号就够：<span class=&quot;source&quot;>##</span> 是标题，<span class=&quot;source&quot;>-</span> 是列表，<span class=&quot;source&quot;>**</span> 是加粗。写的时候看到的就是最后的样子，不用来回对照预览。"><strong>Effortless.</strong> Nothing to configure, no buttons to hunt for, and what you type is what the document looks like.</p>
+      <p data-en-html="<strong>Local.</strong> Everything is a file. Your documents live on your own computer, nothing is uploaded, and no service shutting down can take them with it. Copy the file to move it, and your privacy stays yours." data-zh-html="<strong>本地。</strong>一切皆文件。文档就存在你自己的电脑上，不上传、不经过服务器，也不会因为某个服务关停而消失。换个设备拷个文件就行，隐私始终归你。"><strong>Local.</strong> Everything is a file. Your documents live on your own computer, nothing is uploaded, and no service shutting down can take them with it.</p>
     </div>
   </section>
 
