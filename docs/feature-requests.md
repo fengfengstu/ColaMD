@@ -94,6 +94,14 @@ The reveal button shipped in v2.0.4 and v2.0.5 was unreachable, but not because 
 
 **Decision (2026-09-12):** the button stays hover-only. A constant fourth titlebar icon was considered and dropped: the hover reveal works, and the titlebar should stay as empty as possible.
 
+### Tabs and multi-document workspace
+
+**Sources:** [#59](https://github.com/marswaveai/ColaMD/issues/59)
+
+**Status:** Shipped in `v2.1.0`. Keep several documents open in one window instead of replacing the current document. Each tab holds its own content, unsaved state, undo history and scroll position.
+
+Re-opened as a candidate on 2026-09-11 instead of staying declined, then designed and built during 2026-09-13. The spec lives in `design.md` (section on tabs): user-created tabs only, no strip until there are two tabs, no persistence, no drag between windows. Creation entries are `⌘T`, File → New Tab, and the file panel's right-click Open in New Tab; there is deliberately no plus button in the chrome.
+
 ## Security Maintenance
 
 ### Upgrade Electron and transitive security dependencies
@@ -137,14 +145,6 @@ Bug report: opening the first .md is fast, but opening another file while one is
 **Scope:** A quiet switcher below the title bar, shown only with two or more documents. Start with up to three same-directory documents; preserve each document's content, dirty state, scroll position, and source/visual mode while switching. Do not support cross-directory tabs, drag sorting, pinned tabs, persistence, or startup session restoration. Current-item distinction should rely on subtle light/dark surfaces，not an accent-color underline. Refine the left-side visual spacing before implementation.
 
 **Status:** Candidate. Prototype accepted as direction; not scheduled.
-
-### Tabs and multi-document workspace
-
-**Sources:** [#59](https://github.com/marswaveai/ColaMD/issues/59)
-
-Requested: keep documents from different paths open together in one window instead of replacing the current document.
-
-Re-opened as a candidate on 2026-09-11, at the maintainer's request, instead of staying declined. `design.md` still states "no persistent workspace and no full file tree", so the design document must be updated before this is implemented. The shape is also undecided: a tab strip, an extension of the temporary same-directory switcher, or something else that avoids a permanent extra region.
 
 ### Plugin ecosystem
 
