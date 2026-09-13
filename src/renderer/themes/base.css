@@ -143,6 +143,36 @@ body {
   display: none;
 }
 
+/* The plus that closes the strip's work: it appears with the strip, and the title
+   bar's own plus steps aside, so there is never more than one on screen. */
+.tab-new-btn {
+  flex: none;
+  align-self: flex-end;
+  margin: 0 0 3px 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  -webkit-app-region: no-drag;
+  transition: background 0.12s, color 0.12s;
+}
+
+.tab-new-btn:hover {
+  background: var(--chrome-bg-hover);
+  color: var(--text-color);
+}
+
+body.has-tabs #new-tab-btn {
+  display: none;
+}
+
 .tab-entry {
   position: relative;
   display: flex;
