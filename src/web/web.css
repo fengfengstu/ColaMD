@@ -45,6 +45,12 @@ body {
   color: var(--text-muted);
 }
 
+#try-hint {
+  display: none;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
 #theme-switch {
   display: flex;
   align-items: center;
@@ -53,7 +59,9 @@ body {
   margin-left: auto;
 }
 
-#theme-switch button {
+#theme-switch button,
+#lang-toggle,
+#try-max {
   font: inherit;
   font-size: 12px;
   line-height: 1;
@@ -65,7 +73,9 @@ body {
   cursor: default;
 }
 
-#theme-switch button:hover {
+#theme-switch button:hover,
+#lang-toggle:hover,
+#try-max:hover {
   background: var(--chrome-bg-hover, var(--bg-color));
   color: var(--text-color);
 }
@@ -75,20 +85,19 @@ body {
   color: var(--text-color);
 }
 
-#lang-toggle {
-  font: inherit;
-  font-size: 12px;
-  padding: 5px 9px;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: default;
+#try-max {
+  display: none;
+  align-items: center;
+  gap: 6px;
 }
 
-#lang-toggle:hover {
-  background: var(--chrome-bg-hover, var(--bg-color));
-  color: var(--text-color);
+#try-max::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border: 1.3px solid currentColor;
+  border-radius: 2px;
+  box-shadow: 2px 2px 0 -1px var(--bg-color), 2.5px 2.5px 0 -1px currentColor;
 }
 
 #try-main {
@@ -116,6 +125,56 @@ body {
   min-height: 40vh;
   overflow: visible;
   padding: 12px 40px 120px;
+}
+
+/* Embedded in the homepage: a small block that scrolls on its own, with the
+   full screen button on the right. Everything here only applies while the block
+   is small, so growing to full screen restores the standalone layout. */
+html.try-embed:not(.try-full),
+html.try-embed:not(.try-full) body {
+  height: 100%;
+  overflow: hidden;
+}
+
+html.try-embed:not(.try-full) #try-bar {
+  position: static;
+  padding: 8px 14px;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+html.try-embed:not(.try-full) .try-brand {
+  display: none;
+}
+
+html.try-embed:not(.try-full) #try-hint {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+html.try-embed:not(.try-full) #theme-switch,
+html.try-embed:not(.try-full) #lang-toggle,
+html.try-embed:not(.try-full) #try-note {
+  display: none;
+}
+
+html.try-embed #try-max {
+  display: inline-flex;
+  margin-left: auto;
+}
+
+html.try-embed:not(.try-full) #try-main {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+html.try-embed:not(.try-full) #editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 20px 48px;
 }
 
 @media (max-width: 860px) {

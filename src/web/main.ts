@@ -2,6 +2,12 @@
 // desktop app, with the desktop chrome left out. Nothing here reaches for
 // Electron: the editor core only calls it in four optional, guarded places.
 //
+// Two ways in:
+//   /try/          the standalone page
+//   /try/?embed=1  a small block for the homepage, with a full screen button.
+//                  The homepage owns the frame around it, so this page asks the
+//                  parent over postMessage when to grow and when to come back.
+//
 // Scope is deliberate (MVP): typing, the 12 themes, and one sample document.
 // Tabs, the file list, search, export, diagrams and formulas stay in the app.
 
@@ -13,6 +19,8 @@ import '../renderer/themes/premium.css'
 import './web.css'
 
 type Lang = 'zh' | 'en'
+
+const EMBED = new URLSearchParams(location.search).has('embed')
 
 // id, 中文名, English name. Same twelve themes as the desktop app.
 const THEMES: Array<[string, string, string]> = [
@@ -34,6 +42,9 @@ const COPY = {
   zh: {
     docTitle: 'ColaMD 主题体验',
     subtitle: '主题体验',
+    hint: '这是真的编辑器，直接改这里的字试试。',
+    maximize: '全屏',
+    restore: '退出全屏',
     note: '这是网页预览：写的字不会保存，也不会联网。真正的 ColaMD 把文件放在你自己的电脑上。',
     cta: '下载桌面版',
     toggle: 'EN'
@@ -41,6 +52,9 @@ const COPY = {
   en: {
     docTitle: 'ColaMD themes in the browser',
     subtitle: 'themes, in the browser',
+    hint: 'This is the real editor. Type in it.',
+    maximize: 'Full screen',
+    restore: 'Exit full screen',
     note: 'This is a web preview: nothing is saved and nothing leaves the page. The real ColaMD keeps your files on your own computer.',
     cta: 'Download for desktop',
     toggle: '中文'
@@ -49,6 +63,12 @@ const COPY = {
 
 const THEME_KEY = 'colamd-try-theme'
 const LANG_KEY = 'colamd-try-lang'
+
+// Message types. The child asks, the parent decides; the parent then tells the
+// child what happened, so both sides can never end up disagreeing.
+const ASK_FULLSCREEN = 'colamd-try:ask-fullscreen'
+const SET_FULLSCREEN = 'colamd-try:set-fullscreen'
+const SET_LANG = 'colamd-try:set-lang'
 
 function initialLang(): Lang {
   const saved = localStorage.getItem(LANG_KEY)
@@ -75,20 +95,33 @@ function renderThemeSwitch(lang: Lang, active: string, onPick: (id: string) => v
   }
 }
 
-function applyCopy(lang: Lang): void {
-  const copy = COPY[lang]
-  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
+let lang: Lang = initialLang()
+let theme = initialTheme()
+// Standalone /try/ is already wide open; the embedded block starts small.
+let full = !EMBED
+
+function syncMaxButton(): void {
+  const button = document.getElementById('try-max')
+  if (!button) return
+  const label = full ? COPY[lang].restore : COPY[lang].maximize
+  button.setAttribute('aria-label', label)
+  button.setAttribute('title', label)
+  const span = button.querySelector('span')
+  if (span) span.textContent = label
+}
+
+function applyCopy(next: Lang): void {
+  const copy = COPY[next]
+  document.documentElement.lang = next === 'zh' ? 'zh-CN' : 'en'
   document.title = copy.docTitle
   for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-i18n]'))) {
     const key = el.dataset.i18n as keyof typeof copy
-    if (key in copy) el.textContent = copy[key]
+    if (key in copy && key !== 'maximize') el.textContent = copy[key]
   }
   const toggle = document.getElementById('lang-toggle') as HTMLElement
   toggle.textContent = copy.toggle
+  syncMaxButton()
 }
-
-let lang: Lang = initialLang()
-let theme = initialTheme()
 
 function setTheme(id: string): void {
   theme = id
@@ -105,18 +138,49 @@ function setLang(next: Lang): void {
   setMarkdown(SAMPLES[next], true)
 }
 
+function setFull(next: boolean): void {
+  full = next
+  document.documentElement.classList.toggle('try-full', full)
+  syncMaxButton()
+}
+
+function askFullscreen(next: boolean): void {
+  setFull(next)
+  if (EMBED) window.parent.postMessage({ type: ASK_FULLSCREEN, full: next }, location.origin)
+}
+
 document.getElementById('lang-toggle')?.addEventListener('click', () => {
   setLang(lang === 'zh' ? 'en' : 'zh')
+})
+
+document.getElementById('try-max')?.addEventListener('click', () => askFullscreen(!full))
+
+document.addEventListener('keydown', (event) => {
+  if (EMBED && full && event.key === 'Escape') askFullscreen(false)
+})
+
+window.addEventListener('message', (event) => {
+  if (event.origin !== location.origin) return
+  const data = event.data as { type?: string; full?: boolean; lang?: Lang } | null
+  if (!data || typeof data.type !== 'string') return
+  if (data.type === SET_FULLSCREEN) setFull(Boolean(data.full))
+  if (data.type === SET_LANG && (data.lang === 'zh' || data.lang === 'en')) setLang(data.lang)
 })
 
 applyTheme(theme)
 applyCopy(lang)
 renderThemeSwitch(lang, theme, setTheme)
+setFull(full)
 
 async function boot(): Promise<void> {
   await createEditor('editor')
   setMarkdown(SAMPLES[lang], true)
-  document.querySelector<HTMLElement>('.ProseMirror')?.focus()
+  if (EMBED) {
+    // Tell the homepage we are here and ready for language updates.
+    window.parent.postMessage({ type: 'colamd-try:ready' }, location.origin)
+  } else {
+    document.querySelector<HTMLElement>('.ProseMirror')?.focus()
+  }
 }
 
 void boot()
