@@ -22,6 +22,10 @@ type Lang = 'zh' | 'en'
 
 const EMBED = new URLSearchParams(location.search).has('embed')
 
+// The web page uses the same thin scrollbars the desktop app uses off macOS:
+// the system overlay ones look heavy inside a window.
+document.body.classList.add('web-playground')
+
 // id, 中文名, English name. Same twelve themes as the desktop app.
 const THEMES: Array<[string, string, string]> = [
   ['light', '浅色', 'Light'],
