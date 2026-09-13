@@ -385,14 +385,24 @@ async function activateTab(id: string): Promise<void> {
       enterSourceMode(target.sourceText, 0)
     } else if (target.editorState) {
       exitSourceMode()
-      restoreEditorState(target.editorState)
+      // Swapping in the tab's own editor state is not a user edit. Without this
+      // guard the listener fires, the tab flips to 「已编辑」, and an autosave
+      // rewrites the file the user never touched.
+      applyingProgrammaticChange = true
+      try {
+        restoreEditorState(target.editorState)
+      } finally {
+        applyingProgrammaticChange = false
+      }
     }
-    if (target.dirty) {
-      dirty = true
-      reportDirty()
+    // The tab's own unsaved state decides, never the swap itself.
+    dirty = target.dirty
+    reportDirty()
+    if (dirty) {
       showSaveStatus('dirty')
-      // Edits that were waiting in the background land on disk now.
       if (!changedOnDisk) scheduleAutosave()
+    } else {
+      clearSaveStatus()
     }
     updateWordCount()
     updateFileTitle()

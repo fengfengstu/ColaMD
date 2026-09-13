@@ -24,6 +24,9 @@ html, body {
    with an open bottom edge, so it reads as connected to the document. */
 body.has-tabs {
   --chrome-bg: color-mix(in srgb, var(--text-color) 6%, var(--bg-color));
+  /* Fully opaque, so the hovered tab and the close button that covers text use
+     one solid colour instead of stacking translucent layers. */
+  --chrome-bg-hover: color-mix(in srgb, var(--text-color) 6%, var(--chrome-bg));
 }
 
 body {
@@ -166,7 +169,7 @@ body {
 }
 
 .tab-entry:hover {
-  background: color-mix(in srgb, var(--text-color) 6%, transparent);
+  background: var(--chrome-bg-hover);
   color: var(--text-secondary, var(--text-color));
 }
 
@@ -225,7 +228,7 @@ body {
 }
 
 .tab-entry:not(.active) .tab-entry-close {
-  background: color-mix(in srgb, var(--text-color) 6%, var(--chrome-bg, var(--bg-color)));
+  background: var(--chrome-bg-hover);
 }
 
 .tab-entry:hover .tab-entry-close,
@@ -235,7 +238,7 @@ body {
 
 .tab-entry-close:hover {
   opacity: 1;
-  background: color-mix(in srgb, var(--text-color) 14%, var(--chrome-bg, var(--bg-color)));
+  background: color-mix(in srgb, var(--text-color) 14%, var(--chrome-bg-hover));
 }
 
 .tab-entry.active .tab-entry-close:hover {
