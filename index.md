@@ -26,7 +26,7 @@ If ColaMD is useful to you, please give the project a ⭐ Star.
 *(Nine highlights. The full feature list lives in the [README](https://github.com/marswaveai/ColaMD#features).)*
 
 - **True WYSIWYG**: Type Markdown and see rich text directly. No split-pane preview, nothing to learn.
-- **Clean by Design**: No toolbar, no status bar, nothing to configure. Just a title bar, your text and a file list.
+- **Clean by Design**: No toolbar, no status bar, nothing to configure. Your text and a file list, plus a tab strip that appears only when you open a second document.
 - **Always in Sync**: When the file changes on disk (an AI agent, a script, another editor), the editor updates right away. No reopening, no manual refresh.
 - **Tabs**: Keep several documents open in one window (⌘T opens a new tab). Each tab holds its own content, undo history and scroll position, and switching never mixes them.
 - **Same-Directory Files**: Browse and switch between the Markdown files in the current folder, and drag the panel to the width you like. Files created by an agent appear automatically.
