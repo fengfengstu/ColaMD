@@ -51,6 +51,29 @@ html.try-window .try-shell {
 
 html.try-window #try-bar {
   position: static;
+  /* 两行：第一行品牌在左，语言和退出全屏在右；第二行整行放主题。
+     这样退出全屏永远不会被拆到单独一行去。 */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 6px;
+  padding: 10px 18px;
+}
+
+html.try-window .try-brand {
+  flex: 1 1 auto;
+}
+
+html.try-window #lang-toggle,
+html.try-window #try-max {
+  order: 2;
+}
+
+html.try-window #theme-switch {
+  order: 3;
+  flex: 1 1 100%;
+  margin-left: 0;
 }
 
 html.try-window #try-main {

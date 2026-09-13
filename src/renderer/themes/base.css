@@ -104,7 +104,9 @@ body {
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  padding: 0 14px;
+  /* Left keeps the first tab close to the window edge; the right keeps room
+     for the plus that trails the strip. */
+  padding: 0 14px 0 6px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
