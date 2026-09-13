@@ -149,9 +149,10 @@ body {
   align-items: center;
   gap: 6px;
   flex: 0 1 auto;
-  /* A tab hugs its filename. The floor is one square (the tab is 30px tall), so
-     a tab with no text at all is still a proper target instead of a sliver. */
-  min-width: 30px;
+  /* A tab hugs its filename. The floor is the width of a tab holding `a.md`
+     (50px = 28px of text + 20px padding + 2px border): shorter names stop there
+     rather than collapsing to a bare square. */
+  min-width: 50px;
   max-width: 190px;
   height: 30px;
   /* Symmetric, so the filename sits centred in a tab that hugs it. */
@@ -448,10 +449,6 @@ body {
   height: calc(100vh - 40px - var(--tab-bar-height, 0px));
   overflow-y: auto;
   padding: var(--editor-top-gap, 0px) 40px 40px;
-  /* Column layout so the page below fills exactly what is left of the window:
-     an empty document then has nothing to scroll and no scrollbar. */
-  display: flex;
-  flex-direction: column;
 }
 
 #source-editor {
@@ -724,13 +721,24 @@ body.show-file-panel #source-editor {
   display: none;
 }
 
+/* Milkdown's wrapper holds the editable. It has to reach the bottom of the visible
+   area for two reasons: the editable above it must cover the empty space (clicking
+   under the last line has to place the caret), and a short document must not leave
+   a scrollable sliver behind. min-height: 100% resolves against the editor's own
+   height, so no viewport arithmetic to go stale. */
+#editor > .milkdown {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 #editor .ProseMirror {
   outline: none;
   max-width: 780px;
   margin: 0 auto;
-  /* Fills the visible area, grows with the text. No hard-coded viewport sums:
-     those went stale every time the title bar or the tab strip changed height. */
+  /* Fills the wrapper, grows with the text. */
   flex: 1 0 auto;
+  width: 100%;
   font-size: 16px;
   line-height: 1.75;
   color: var(--text-color);

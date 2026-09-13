@@ -633,7 +633,11 @@ export function getEditorState(): EditorState | null {
 // go through Markdown, or the undo stack and the selection would be lost.
 export function restoreEditorState(state: EditorState): void {
   const view = getEditorView()
-  if (view) view.updateState(state)
+  if (!view) return
+  view.updateState(state)
+  // updateState replaces the view's DOM, which drops the focus: bring the caret
+  // back so the switched-to tab is ready to type in.
+  view.focus()
 }
 
 // Follow the style of the document being opened. Called on load, on external
