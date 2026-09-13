@@ -1,4 +1,5 @@
-import { createEditor, flashHeadingOnArrival, getMarkdown, onEditorJumpPhase, setMarkdown, showMathModal, setMathModalLanguage, releaseMermaidRenderer, getEditorState, restoreEditorState } from './editor/editor'
+import { createEditor, flashHeadingOnArrival, getMarkdown, onEditorJumpPhase, setMarkdown, showMathModal, setMathModalLanguage, releaseMermaidRenderer, getEditorState, restoreEditorState, applyMarkdownStyle } from './editor/editor'
+import { detectMarkdownStyle } from './editor/markdown-style'
 import { SearchPanel } from './editor/search-panel'
 import { applyTheme, loadSavedTheme } from './themes/theme-manager'
 import { setUiLanguage, isChinese, type UiLanguage } from './ui-language'
@@ -242,7 +243,7 @@ function hideTabTip(): void {
 }
 // Space between the tab strip and the document, matching the editor's side
 // padding so the page does not start right under the tabs.
-const TAB_BAR_TOP_GAP = 34
+const TAB_BAR_TOP_GAP = 18
 
 function closeGlyph(): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -366,6 +367,9 @@ async function activateTab(id: string): Promise<void> {
     // watcher, the title and the recent list, and reports whether the file
     // changed while this tab sat in the background.
     const disk = target.filePath ? await window.electronAPI.activateFile(target.filePath) : null
+    // This document may have been written in a different style than the one we
+    // are leaving; restore its own serialiser style with its content.
+    applyMarkdownStyle(detectMarkdownStyle(target.content))
     activeTabId = target.id
     currentFilePath = target.filePath
     documentRevision = target.revision
@@ -1059,6 +1063,10 @@ function exitSourceMode(): void {
 const LARGE_DOCUMENT_SOURCE_THRESHOLD = 512 * 1024
 
 function setContent(content: string, flushHistory = false): void {
+  // Follow the incoming document's Markdown style before it is parsed, so a
+  // save writes the same markers the file already used.
+  const detectedStyle = detectMarkdownStyle(content)
+  applyMarkdownStyle(detectedStyle)
   if (content.length >= LARGE_DOCUMENT_SOURCE_THRESHOLD) {
     // ProseMirror renders the whole document eagerly. Keep very large files in
     // the existing source editor so opening them stays responsive on Windows.

@@ -14,6 +14,7 @@ import { mermaidView } from './mermaid-view'
 import { releaseMermaidRenderer as releaseMermaidRendererBridge } from './mermaid-bridge'
 import { mathModal } from './math-modal'
 import { highlight, remarkHighlight, highlightStringifyHandler } from './highlight'
+import { type MarkdownStyle } from './markdown-style'
 import { isChinese } from '../ui-language'
 
 import 'katex/dist/katex.min.css'
@@ -208,6 +209,10 @@ export function releaseMermaidRenderer(): void {
 }
 
 let editorInstance: Editor | null = null
+// Serialiser options as configured at creation (handlers included). The
+// per-document Markdown style is layered on top of these, never replacing them.
+let baseStringifyOptions: Record<string, unknown> = {}
+let markdownStyleOptions: MarkdownStyle = {}
 
 const inlineStyles: Record<string, string> = {
   'h1': 'font-size:1.8em;margin:1em 0 .5em;padding-bottom:.3em;border-bottom:1px solid #eee;',
@@ -453,7 +458,7 @@ export async function createEditor(
       ctx.set(katexOptionsCtx.key, { throwOnError: false })
       // Teach remark-stringify how to emit our custom ==highlight== node
       const stringifyOptions = ctx.get(remarkStringifyOptionsCtx)
-      ctx.set(remarkStringifyOptionsCtx, {
+      baseStringifyOptions = {
         ...stringifyOptions,
         // Keep the editor's smart line breaks as plain Markdown newlines.
         // remark-breaks restores them on parse, so source mode never leaks `\`.
@@ -461,8 +466,9 @@ export async function createEditor(
           ...stringifyOptions.handlers,
           mark: highlightStringifyHandler,
           break: () => '\n'
-        } as typeof stringifyOptions.handlers,
-      })
+        } as typeof stringifyOptions.handlers
+      }
+      ctx.set(remarkStringifyOptionsCtx, { ...baseStringifyOptions, ...markdownStyleOptions })
       if (onChange) {
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
           onChange(markdown)
@@ -628,4 +634,18 @@ export function getEditorState(): EditorState | null {
 export function restoreEditorState(state: EditorState): void {
   const view = getEditorView()
   if (view) view.updateState(state)
+}
+
+// Follow the style of the document being opened. Called on load, on external
+// reload and when switching back to a tab, so each document keeps its own
+// markers instead of being normalised to the serialiser's defaults.
+export function applyMarkdownStyle(style: MarkdownStyle): void {
+  markdownStyleOptions = style
+  if (!editorInstance) return
+  editorInstance.action((ctx) => {
+    const options = ctx.get(remarkStringifyOptionsCtx) as Record<string, unknown>
+    // Milkdown builds its remark processor once at init and keeps this object,
+    // so the style is applied by mutating it in place.
+    Object.assign(options, { bullet: undefined, rule: undefined, emphasis: undefined, strong: undefined, fence: undefined }, style)
+  })
 }

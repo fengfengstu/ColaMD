@@ -196,13 +196,13 @@ body {
   opacity: 0.5;
 }
 
-/* The close button is an overlay: it takes no space until the tab is hovered, and
-   the name only steps aside on hover, so a resting tab hugs its filename and a
-   hovered one never hides letters. */
+/* The close button floats over the tab: no width, no padding, nothing reserved
+   at rest, so a resting tab hugs its filename exactly. It masks what is behind
+   it with the tab's own surface colour, so a truncated name stays readable. */
 .tab-entry-close {
   position: absolute;
   top: 50%;
-  right: 6px;
+  right: 5px;
   transform: translateY(-50%);
   flex: none;
   width: 16px;
@@ -220,18 +220,26 @@ body {
   transition: opacity 0.12s, background 0.12s;
 }
 
+.tab-entry.active .tab-entry-close {
+  background: var(--bg-color);
+}
+
+.tab-entry:not(.active) .tab-entry-close {
+  background: color-mix(in srgb, var(--text-color) 6%, var(--chrome-bg, var(--bg-color)));
+}
+
 .tab-entry:hover .tab-entry-close,
 .tab-entry.active .tab-entry-close:focus-visible {
   opacity: 0.75;
 }
 
-.tab-entry:hover .tab-entry-name {
-  padding-right: 20px;
-}
-
 .tab-entry-close:hover {
   opacity: 1;
-  background: color-mix(in srgb, var(--text-color) 14%, transparent);
+  background: color-mix(in srgb, var(--text-color) 14%, var(--chrome-bg, var(--bg-color)));
+}
+
+.tab-entry.active .tab-entry-close:hover {
+  background: color-mix(in srgb, var(--text-color) 12%, var(--bg-color));
 }
 
 /* The strip clips its own overflow, so the shortcut hint lives in a fixed layer
