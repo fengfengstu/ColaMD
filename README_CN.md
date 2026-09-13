@@ -22,11 +22,11 @@ ColaMD 是一款开源、免费、优雅的 Markdown 编辑器，用于写作、
 ## 截图
 
 <p align="center">
-  <img src="docs/images/markdown-cheatsheet.png" alt="ColaMD Markdown 语法速查与交互式待办列表" width="49%">
-  <img src="docs/images/markdown-rendering.png" alt="ColaMD Markdown 渲染、代码块、引用、表格与智能换行" width="49%">
+  <img src="docs/images/tasks-zh.png" alt="ColaMD 打开的待办列表演示文档" width="49%">
+  <img src="docs/images/rendering-zh.png" alt="ColaMD 渲染的表格与行内代码" width="49%">
 </p>
 
-<p align="center"><em>内置语法速查、交互式待办列表、代码块、引用、表格与智能换行。</em></p>
+<p align="center"><em>交互式待办列表，以及边写边渲染的标题、链接、表格与行内代码。</em></p>
 
 ## 主题
 

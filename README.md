@@ -20,11 +20,11 @@ Whatever writes the file (an AI agent such as Claude Code or Codex, a script, or
 ## Screenshots
 
 <p align="center">
-  <img src="docs/images/markdown-cheatsheet.png" alt="ColaMD Markdown cheatsheet and interactive task list" width="49%">
-  <img src="docs/images/markdown-rendering.png" alt="ColaMD Markdown rendering with code blocks, quotes, tables, and smart line breaks" width="49%">
+  <img src="docs/images/tasks-en.png" alt="ColaMD showing an interactive task list" width="49%">
+  <img src="docs/images/rendering-en.png" alt="ColaMD rendering a table and inline code" width="49%">
 </p>
 
-<p align="center"><em>Built-in syntax reference, interactive task lists, code blocks, quotes, tables, and smart line breaks.</em></p>
+<p align="center"><em>Interactive task lists, and Markdown rendered as you type: headings, links, tables and inline code.</em></p>
 
 ## Themes
 
