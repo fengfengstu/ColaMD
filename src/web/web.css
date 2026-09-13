@@ -1,0 +1,126 @@
+/* The web playground's own chrome. It borrows the app's theme variables, so the
+   bar around the editor restyles itself whenever the theme changes. */
+
+html, body {
+  height: auto;
+  min-height: 100%;
+  overflow: auto;
+  background: var(--bg-color);
+  color: var(--text-color);
+}
+
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#try-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  background: var(--chrome-bg, var(--bg-color));
+  border-bottom: 1px solid var(--border-color);
+}
+
+.try-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.try-brand strong {
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
+
+.try-brand span {
+  color: var(--text-muted);
+}
+
+#theme-switch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+#theme-switch button {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+#theme-switch button:hover {
+  background: var(--chrome-bg-hover, var(--bg-color));
+  color: var(--text-color);
+}
+
+#theme-switch button[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--text-color) 22%, transparent);
+  color: var(--text-color);
+}
+
+#lang-toggle {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+#lang-toggle:hover {
+  background: var(--chrome-bg-hover, var(--bg-color));
+  color: var(--text-color);
+}
+
+#try-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#try-note {
+  margin: 0;
+  padding: 18px 40px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+#try-note a {
+  margin-left: 6px;
+  color: var(--link-color);
+}
+
+/* The app's editor is a fixed-height scroller inside a window; on the web the page
+   itself scrolls, so the editor just grows with the text. */
+#editor {
+  height: auto;
+  min-height: 40vh;
+  overflow: visible;
+  padding: 12px 40px 120px;
+}
+
+@media (max-width: 860px) {
+  #try-bar { padding: 10px 14px; }
+  #theme-switch { margin-left: 0; }
+  #try-note { padding: 14px 18px 0; }
+  #editor { padding: 10px 18px 80px; }
+}
