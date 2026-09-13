@@ -1,4 +1,4 @@
-import { createEditor, flashHeadingOnArrival, getMarkdown, onEditorJumpPhase, setMarkdown, showMathModal, setMathModalLanguage, releaseMermaidRenderer } from './editor/editor'
+import { createEditor, flashHeadingOnArrival, getMarkdown, onEditorJumpPhase, setMarkdown, showMathModal, setMathModalLanguage, releaseMermaidRenderer, getEditorState, restoreEditorState } from './editor/editor'
 import { SearchPanel } from './editor/search-panel'
 import { applyTheme, loadSavedTheme } from './themes/theme-manager'
 import { setUiLanguage, isChinese, type UiLanguage } from './ui-language'
@@ -128,11 +128,317 @@ function clearSaveStatus(): void {
   }
 }
 
+// An external edit landing while the user still has unsaved changes must never
+// clobber the editor, and plain autosave would silently overwrite the external
+// edit. Pause autosave and let the user choose explicitly.
+function raiseExternalConflict(): void {
+  if (externalConflictPending) return
+  externalConflictPending = true
+  if (autosaveTimer) {
+    clearTimeout(autosaveTimer)
+    autosaveTimer = null
+  }
+  const el = saveStatusEl()
+  if (el) {
+    if (saveStatusTimer) {
+      clearTimeout(saveStatusTimer)
+      saveStatusTimer = null
+    }
+    el.textContent = isChinese() ? '文件已被外部修改' : 'File changed externally'
+    el.classList.remove('saved')
+    el.classList.add('pending')
+  }
+  window.electronAPI.reportExternalConflict?.()
+}
+
+// --- Tabs (design.md) ---
+// Tabs are created by the user (the + button or ⌘T) and never appear on their own.
+// The module-level document state above always describes the ACTIVE tab, so every
+// existing path (save, autosave, external conflict, outline, source mode) keeps
+// working unchanged. Background tabs keep a snapshot of their own state, which
+// makes switching a capture/restore pair instead of a second document machine.
+interface DocumentTab {
+  id: string
+  filePath: string | null
+  dirty: boolean
+  revision: number
+  sourceMode: boolean
+  sourceText: string
+  content: string
+  editorState: import('@milkdown/kit/prose/state').EditorState | null
+  diskContent: string | null
+  scrollTop: number
+}
+
+const tabs: DocumentTab[] = []
+let activeTabId: string | null = null
+let nextTabId = 1
+let switchingTab = false
+
+const tabBarEl = () => document.getElementById('tab-bar') as HTMLElement
+const newTabBtnEl = () => document.getElementById('new-tab-btn') as HTMLButtonElement
+
+function activeTab(): DocumentTab | null {
+  return tabs.find((tab) => tab.id === activeTabId) ?? null
+}
+
+function untitledLabel(): string {
+  return fileTitleEl().dataset.untitled || 'Untitled'
+}
+
+function tabLabel(tab: DocumentTab): string {
+  if (!tab.filePath) return untitledLabel()
+  return tab.filePath.split(/[\\/]/).pop() || tab.filePath
+}
+
+// Read the live state back into the active tab's record. Called before every
+// switch, close and bar render, so the records and the screen cannot disagree.
+function captureActiveTab(): void {
+  const tab = activeTab()
+  if (!tab) return
+  tab.filePath = currentFilePath
+  tab.dirty = dirty
+  tab.revision = documentRevision
+  tab.sourceMode = sourceModeActive
+  tab.content = getContent()
+  if (sourceModeActive) {
+    tab.sourceText = sourceEl().value
+    tab.scrollTop = sourceEl().scrollTop
+  } else {
+    tab.editorState = getEditorState()
+    tab.scrollTop = editorEl().scrollTop
+  }
+}
+
+// The bar only carries the unsaved mark that the tab already owns; the title bar
+// keeps the primary save hint.
+function markActiveTabDirty(): void {
+  const tab = activeTab()
+  if (!tab) return
+  tab.dirty = dirty
+  const entry = tabBarEl().querySelector(`.tab-entry[data-tab-id="${tab.id}"]`)
+  entry?.classList.toggle('dirty', dirty)
+}
+
+function renderTabBar(): void {
+  captureActiveTab()
+  const bar = tabBarEl()
+  const visible = tabs.length > 1
+  bar.hidden = !visible
+  document.documentElement.style.setProperty('--tab-bar-height', visible ? '34px' : '0px')
+  bar.innerHTML = ''
+  if (!visible) return
+  for (const tab of tabs) {
+    const entry = document.createElement('button')
+    entry.type = 'button'
+    entry.className = 'tab-entry'
+    entry.dataset.tabId = tab.id
+    entry.title = tab.filePath ?? tabLabel(tab)
+    if (tab.id === activeTabId) entry.classList.add('active')
+    if (tab.dirty) entry.classList.add('dirty')
+    const name = document.createElement('span')
+    name.className = 'tab-entry-name'
+    name.textContent = tabLabel(tab)
+    entry.append(name)
+    bar.append(entry)
+  }
+  const active = bar.querySelector('.tab-entry.active')
+  active?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  // Let the main process know which files this window holds in tabs, so opening
+  // an already open document can focus that tab instead of duplicating it.
+  window.electronAPI.setTabFiles(tabs.map((tab) => tab.filePath).filter((path): path is string => !!path))
+}
+
+function showBlankDocument(): void {
+  releaseMermaidRenderer()
+  exitSourceMode()
+  applyingProgrammaticChange = true
+  try {
+    setMarkdown('', true)
+  } finally {
+    applyingProgrammaticChange = false
+  }
+  updateWordCount('')
+  resetDirty()
+  updateFileTitle()
+  updateFileRevealButton()
+  updatePanelVisibility()
+  void refreshSiblings()
+  scheduleOutlineUpdate()
+  editorEl().scrollTop = 0
+  sourceEl().scrollTop = 0
+}
+
+// Switching away must not lose work. A tab with a path is flushed through the
+// usual queue (same rule the file panel already followed); an untitled tab keeps
+// its content in its own record and is only decided on when it would really be
+// dropped (closing the tab, or closing the window).
+async function saveTabForLeaving(tab: DocumentTab | null): Promise<boolean> {
+  if (!tab || !tab.dirty || !tab.filePath) return true
+  return await saveCurrent()
+}
+
+async function openNewTab(): Promise<void> {
+  const previous = activeTab()
+  captureActiveTab()
+  if (!await saveTabForLeaving(previous)) return
+  const tab: DocumentTab = {
+    id: `tab-${nextTabId++}`,
+    filePath: null,
+    dirty: false,
+    revision: ++documentRevision,
+    sourceMode: false,
+    sourceText: '',
+    content: '',
+    editorState: null,
+    diskContent: null,
+    scrollTop: 0
+  }
+  tabs.push(tab)
+  activeTabId = tab.id
+  currentFilePath = null
+  showBlankDocument()
+  renderTabBar()
+}
+
+async function activateTab(id: string): Promise<void> {
+  if (switchingTab || id === activeTabId) return
+  const target = tabs.find((tab) => tab.id === id)
+  if (!target) return
+  const previous = activeTab()
+  captureActiveTab()
+  if (!await saveTabForLeaving(previous)) return
+  switchingTab = true
+  try {
+    // Point the window at the incoming document first: this re-points the file
+    // watcher, the title and the recent list, and reports whether the file
+    // changed while this tab sat in the background.
+    const disk = target.filePath ? await window.electronAPI.activateFile(target.filePath) : null
+    activeTabId = target.id
+    currentFilePath = target.filePath
+    documentRevision = target.revision
+    dirty = false
+    externalConflictPending = false
+    const changedOnDisk = !!disk && target.diskContent !== null && disk.content !== target.diskContent
+    if (changedOnDisk && !target.dirty) {
+      target.diskContent = disk!.content
+      setContent(disk!.content, true)
+      clearDirty()
+      clearSaveStatus()
+    } else if (target.sourceMode) {
+      enterSourceMode(target.sourceText, 0)
+    } else if (target.editorState) {
+      exitSourceMode()
+      restoreEditorState(target.editorState)
+    }
+    if (target.dirty) {
+      dirty = true
+      reportDirty()
+      showSaveStatus('dirty')
+      // Edits that were waiting in the background land on disk now.
+      if (!changedOnDisk) scheduleAutosave()
+    }
+    updateWordCount()
+    updateFileTitle()
+    updateFileRevealButton()
+    updatePanelVisibility()
+    void refreshSiblings()
+    scheduleOutlineUpdate()
+    const restoreScroll = (): void => {
+      if (target.sourceMode) sourceEl().scrollTop = target.scrollTop
+      else editorEl().scrollTop = target.scrollTop
+    }
+    restoreScroll()
+    requestAnimationFrame(restoreScroll)
+    renderTabBar()
+    if (changedOnDisk && target.dirty) raiseExternalConflict()
+  } finally {
+    switchingTab = false
+  }
+}
+
+async function closeTab(id: string): Promise<void> {
+  const index = tabs.findIndex((tab) => tab.id === id)
+  if (index < 0) return
+  const tab = tabs[index]
+  if (tab.id === activeTabId) {
+    captureActiveTab()
+    if (!await saveTabForLeaving(tab)) return
+    if (tab.dirty && !tab.filePath && !confirmDiscardUntitled()) return
+  } else if (tab.dirty) {
+    // A background tab is not the active document, so it is written straight to
+    // its own path; an untitled one cannot be written without a dialog.
+    if (tab.filePath) {
+      const saved = await window.electronAPI.saveFile(tab.content, tab.filePath, false, false)
+      if (!saved) return
+      tab.dirty = false
+    } else if (!confirmDiscardUntitled()) {
+      return
+    }
+  }
+  tabs.splice(index, 1)
+  if (tabs.length === 0) {
+    // The last tab closed: the window falls back to a single blank document and
+    // the bar disappears with it.
+    activeTabId = null
+    await openNewTab()
+    return
+  }
+  if (tab.id === activeTabId) {
+    activeTabId = null
+    await activateTab(tabs[Math.min(index, tabs.length - 1)].id)
+  }
+  renderTabBar()
+}
+
+// An untitled tab has nowhere to go on disk, so closing it asks first.
+function confirmDiscardUntitled(): boolean {
+  return window.confirm(isChinese()
+    ? '这个标签页还没有保存，关闭会丢掉里面的内容。'
+    : 'This tab has unsaved content. Close it anyway?')
+}
+
+function bindTabBar(api: import('../preload/index').ElectronAPI): void {
+  newTabBtnEl().addEventListener('click', () => { void openNewTab() })
+  api.onMenuNewTab(() => { void openNewTab() })
+  api.onMenuCloseTab(() => { if (activeTabId) void closeTab(activeTabId) })
+  api.onFocusFile((path) => {
+    const tab = tabs.find((candidate) => candidate.filePath === path)
+    if (tab) void activateTab(tab.id)
+  })
+  tabBarEl().addEventListener('click', (e) => {
+    const entry = (e.target as HTMLElement).closest('.tab-entry') as HTMLElement | null
+    const id = entry?.dataset.tabId
+    if (id) void activateTab(id)
+  })
+  // Middle click closes, the browser convention; the bar stays free of a
+  // permanent close affordance (design.md).
+  tabBarEl().addEventListener('auxclick', (e) => {
+    if (e.button !== 1) return
+    const entry = (e.target as HTMLElement).closest('.tab-entry') as HTMLElement | null
+    const id = entry?.dataset.tabId
+    if (!id) return
+    e.preventDefault()
+    void closeTab(id)
+  })
+}
+
+// Keep the active tab's record in step with a successful write, so switching
+// back to it later can tell whether the file changed underneath us.
+function noteTabSaved(content: string): void {
+  const tab = activeTab()
+  if (!tab) return
+  tab.diskContent = content
+  tab.filePath = currentFilePath
+  tab.dirty = dirty
+}
+
 function setDirty(): void {
   documentRevision += 1
   dirty = true
   reportDirty()
   showSaveStatus('dirty')
+  markActiveTabDirty()
   scheduleAutosave()
 }
 
@@ -143,6 +449,7 @@ function clearDirty(): void {
     autosaveTimer = null
   }
   reportDirty()
+  markActiveTabDirty()
 }
 
 // Invalidate any in-flight save captured from the previous document before
@@ -183,6 +490,7 @@ async function runAutosave(): Promise<void> {
   if (path && revision === documentRevision && currentFilePath === filePath) {
     currentFilePath = path
     clearDirty()
+    noteTabSaved(content)
     showSaveStatus('saved')
   }
 }
@@ -200,6 +508,8 @@ async function saveCurrent(saveAs = false): Promise<boolean> {
   updateFileTitle()
   updateFileRevealButton()
   refreshSiblings()
+  noteTabSaved(content)
+  if (path !== expectedPath) renderTabBar()
   if (revision === documentRevision) {
     clearDirty()
     showSaveStatus('saved')
@@ -785,8 +1095,16 @@ async function init(): Promise<void> {
   resetDirty()
 
   // Main asks for an authoritative snapshot before any close or quit.
-  api.onRequestDocumentState((requestId) => {
-    window.electronAPI.respondDocumentState(requestId, { dirty, content: getContent() })
+  api.onRequestDocumentState(async (requestId) => {
+    captureActiveTab()
+    // Report every tab that still has unsaved content. The main process writes
+    // the ones with a path and refuses to close on the untitled ones, so a
+    // background tab can never be dropped silently.
+    window.electronAPI.respondDocumentState(requestId, {
+      dirty,
+      content: getContent(),
+      tabs: tabs.filter((tab) => tab.dirty).map((tab) => ({ path: tab.filePath, content: tab.content }))
+    })
   })
   api.reportRendererReady()
 
@@ -813,6 +1131,8 @@ async function init(): Promise<void> {
     void api.showEntryContextMenu(path, kind === 'directory' ? 'directory' : 'file')
   })
   initPanelResize()
+  bindTabBar(api)
+  renderTabBar()
   fileTabEl().addEventListener('click', () => setPanelMode('files'))
   outlineTabEl().addEventListener('click', () => setPanelMode('outline'))
   api.onToggleFilePanel(() => togglePanel())
@@ -856,7 +1176,32 @@ async function init(): Promise<void> {
   api.onNewFile(() => { releaseMermaidRenderer(); exitSourceMode(); applyContent(''); scheduleOutlineUpdate() })
   api.onFileOpened((data) => {
     releaseMermaidRenderer()
+    // The window always opens with exactly one document; the bar for it appears
+    // only once the user creates a second tab.
+    if (tabs.length === 0) {
+      tabs.push({
+        id: `tab-${nextTabId++}`,
+        filePath: null,
+        dirty: false,
+        revision: documentRevision,
+        sourceMode: false,
+        sourceText: '',
+        content: '',
+        editorState: null,
+        diskContent: null,
+        scrollTop: 0
+      })
+      activeTabId = tabs[0].id
+    }
     currentFilePath = data.path
+    dirty = false
+    const tab = activeTab()
+    if (tab) {
+      tab.filePath = data.path
+      tab.dirty = false
+      tab.revision = documentRevision
+      tab.diskContent = data.content
+    }
     updateFileRevealButton()
     resetDirty()
     setContent(data.content, true)
@@ -870,29 +1215,11 @@ async function init(): Promise<void> {
     updatePanelVisibility()
     refreshSiblings()
     scheduleOutlineUpdate()
+    renderTabBar()
   })
   api.onFileChanged((content) => {
-    // An external edit landing while the user still has unsaved changes must
-    // never clobber the editor, and plain autosave would silently overwrite
-    // the external edit. Pause autosave and let the user choose explicitly.
     if (dirty) {
-      if (externalConflictPending) return
-      externalConflictPending = true
-      if (autosaveTimer) {
-        clearTimeout(autosaveTimer)
-        autosaveTimer = null
-      }
-      const el = saveStatusEl()
-      if (el) {
-        if (saveStatusTimer) {
-          clearTimeout(saveStatusTimer)
-          saveStatusTimer = null
-        }
-      el.textContent = isChinese() ? '文件已被外部修改' : 'File changed externally'
-      el.classList.remove('saved')
-        el.classList.add('pending')
-      }
-      window.electronAPI.reportExternalConflict?.()
+      raiseExternalConflict()
       return
     }
     if (sourceModeActive) {

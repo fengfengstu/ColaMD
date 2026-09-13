@@ -181,11 +181,17 @@ interface WindowState {
   rendererReady: boolean
   writeQueue: Promise<void>
   closeAuthorized: boolean
+  // Every file this window holds open in a tab, reported by the renderer. Used
+  // to focus an existing tab instead of opening a duplicate window.
+  tabFiles: string[]
 }
 
 interface DocumentSnapshot {
   dirty: boolean
   content: string
+  // Every tab of the window that still has unsaved content. `path === null`
+  // means an untitled tab, which cannot be written without asking the user.
+  tabs?: { path: string | null; content: string }[]
 }
 
 interface PendingDocumentStateRequest {
@@ -203,7 +209,7 @@ const pendingDocumentStateRequests = new Map<string, PendingDocumentStateRequest
 function getState(win: BrowserWindow): WindowState {
   let state = windowStates.get(win.id)
   if (!state) {
-    state = { filePath: null, browsePath: null, watcher: null, isInternalSave: false, internalSaveCount: 0, lastKnownMtime: 0, lastInternalSaveContent: null, debounceTimer: null, siblingsTimer: null, dirty: false, closePromise: null, rendererReady: false, writeQueue: Promise.resolve(), closeAuthorized: false }
+    state = { filePath: null, browsePath: null, watcher: null, isInternalSave: false, internalSaveCount: 0, lastKnownMtime: 0, lastInternalSaveContent: null, debounceTimer: null, siblingsTimer: null, dirty: false, closePromise: null, rendererReady: false, writeQueue: Promise.resolve(), closeAuthorized: false, tabFiles: [] }
     windowStates.set(win.id, state)
   }
   return state
@@ -513,11 +519,14 @@ function loadFileInWindow(win: BrowserWindow, filePath: string): void {
   state.writeQueue = next.then(() => undefined, () => undefined)
 }
 
-// Find window that already has this file open
+// Find window that already has this file open, either as its active document or
+// in one of its tabs.
 function findWindowForFile(filePath: string): BrowserWindow | null {
   for (const [id, state] of windowStates) {
-    if (state.filePath === filePath) {
-      return BrowserWindow.fromId(id) || null
+    if (state.filePath === filePath || state.tabFiles.includes(filePath)) {
+      const win = BrowserWindow.fromId(id)
+      if (win && state.filePath !== filePath) win.webContents.send('focus-file', filePath)
+      return win
     }
   }
   return null
@@ -701,6 +710,36 @@ ipcMain.handle('open-file-path', async (event, filePath: string) => {
   }
 })
 
+// Switch the window's active document without touching the renderer's content.
+// Tabs keep their own editor state in the renderer, so this only re-points what
+// belongs to the window: watcher, title, recent list and file panel. The disk
+// version is returned so the caller can tell whether it changed while this tab
+// was in the background.
+ipcMain.handle('activate-file', async (event, filePath: unknown) => {
+  const win = getWinFromEvent(event)
+  if (!win || typeof filePath !== 'string' || filePath.length === 0) return null
+  const state = getState(win)
+  const operation = async (): Promise<{ content: string; mtime: number } | null> => {
+    try {
+      const data = await readFile(filePath, 'utf-8')
+      if (win.isDestroyed()) return null
+      state.filePath = filePath
+      state.browsePath = dirname(filePath)
+      state.lastInternalSaveContent = data
+      state.lastKnownMtime = fileMtimeMs(filePath)
+      watchFile(win, state)
+      updateTitle(win)
+      pushRecentFile(filePath, true)
+      return { content: resolveImagePaths(data, filePath), mtime: state.lastKnownMtime }
+    } catch {
+      return null
+    }
+  }
+  const next = state.writeQueue.then(operation, operation)
+  state.writeQueue = next.then(() => undefined, () => undefined)
+  return next
+})
+
 // Same-directory file panel: list markdown files next to the open file
 ipcMain.handle('list-siblings', async (event) => {
   const win = getWinFromEvent(event)
@@ -727,6 +766,13 @@ ipcMain.handle('open-sibling', async (event, filePath: string) => {
   }
   loadFileInWindow(win, filePath)
   return true
+})
+
+ipcMain.on('set-tab-files', (event, paths: unknown) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win) return
+  const state = getState(win)
+  state.tabFiles = Array.isArray(paths) ? paths.filter((path): path is string => typeof path === 'string') : []
 })
 
 ipcMain.handle('save-file', async (event, content: string, expectedPath?: string, rebuildMenu?: boolean, autosave?: boolean) => {
@@ -1223,6 +1269,7 @@ function buildMenu(): void {
     ? {
         file: '文件', edit: '编辑', view: '视图', theme: '主题', help: '帮助',
         newFile: '新建', open: '打开...', save: '保存', saveAs: '另存为...',
+        newTab: '新建标签页', closeTab: '关闭标签页',
         recentOpen: '最近打开', restoreOnLaunch: '启动时打开上次文档', clearRecent: '清除最近记录',
         exportPDF: '导出 PDF...', exportHTML: '导出 HTML...', exportWord: '导出 Word...', exportImageDesktop: '导出图片（电脑阅读）...', exportImageMobile: '导出图片（手机阅读）...', find: '查找',
         setDefault: '设置为默认应用...',
@@ -1241,6 +1288,7 @@ function buildMenu(): void {
     : {
         file: 'File', edit: 'Edit', view: 'View', theme: 'Theme', help: 'Help',
         newFile: 'New', open: 'Open...', save: 'Save', saveAs: 'Save As...',
+        newTab: 'New Tab', closeTab: 'Close Tab',
         recentOpen: 'Open Recent', restoreOnLaunch: 'Reopen last document at launch', clearRecent: 'Clear Recent',
         exportPDF: 'Export PDF...', exportHTML: 'Export HTML...', exportWord: 'Export Word...', exportImageDesktop: 'Export Image (Desktop)...', exportImageMobile: 'Export Image (Mobile)...', find: 'Find',
         setDefault: 'Set as Default...',
@@ -1348,6 +1396,17 @@ function buildMenu(): void {
         },
         { type: 'separator' },
         {
+          label: labels.newTab,
+          accelerator: 'CmdOrCtrl+T',
+          click: () => sendToFocused('menu-new-tab')
+        },
+        {
+          label: labels.closeTab,
+          accelerator: 'CmdOrCtrl+W',
+          click: () => sendToFocused('menu-close-tab')
+        },
+        { type: 'separator' },
+        {
           label: labels.save,
           accelerator: 'CmdOrCtrl+S',
           click: () => sendToFocused('menu-save')
@@ -1384,7 +1443,7 @@ function buildMenu(): void {
           click: () => setAsDefaultApp()
         },
         { type: 'separator' },
-        isMac ? { label: labels.close, role: 'close' } : { label: labels.quit, role: 'quit' }
+        isMac ? { label: labels.close, accelerator: 'CmdOrCtrl+Shift+W', role: 'close' } : { label: labels.quit, role: 'quit' }
       ]
     },
     {
@@ -1639,13 +1698,19 @@ function requestDocumentState(win: BrowserWindow): Promise<DocumentSnapshot | nu
 
 ipcMain.on('document-state-response', (event, requestId: unknown, snapshot: unknown) => {
   if (typeof requestId !== 'string' || !snapshot || typeof snapshot !== 'object') return
-  const { dirty, content } = snapshot as DocumentSnapshot
+  const { dirty, content, tabs } = snapshot as DocumentSnapshot
   if (typeof dirty !== 'boolean' || typeof content !== 'string') return
   const pending = pendingDocumentStateRequests.get(requestId)
   if (!pending || pending.webContentsId !== event.sender.id) return
   pendingDocumentStateRequests.delete(requestId)
   clearTimeout(pending.timer)
-  pending.resolve({ dirty, content })
+  pending.resolve({
+    dirty,
+    content,
+    tabs: Array.isArray(tabs)
+      ? tabs.filter((tab) => tab && typeof tab.content === 'string' && (tab.path === null || typeof tab.path === 'string'))
+      : undefined
+  })
 })
 
 ipcMain.on('renderer-ready', (event) => {
@@ -1723,6 +1788,37 @@ async function handleWindowClose(win: BrowserWindow, state: WindowState): Promis
     })
     if (saveAs.canceled || !saveAs.filePath) return false
     filePath = saveAs.filePath
+  }
+
+  // Background tabs are not the window's active document, so they bypass the
+  // active-file guards and are written straight to their own paths. An untitled
+  // background tab cannot be written without a dialog, so it is reported
+  // instead of being dropped silently.
+  const backgroundTabs = (snapshot.tabs ?? []).filter((tab) => tab.path && tab.path !== sourcePath)
+  const untitledTabs = (snapshot.tabs ?? []).filter((tab) => !tab.path)
+  for (const tab of backgroundTabs) {
+    try {
+      await writeFile(tab.path as string, restoreImagePaths(tab.content, tab.path as string), 'utf-8')
+    } catch {
+      await dialog.showMessageBox(win, {
+        type: 'error',
+        buttons: ['好'],
+        message: '无法保存标签页',
+        detail: `“${basename(tab.path as string)}” 写入失败，为保护内容已取消关闭。`
+      })
+      return false
+    }
+  }
+  if (untitledTabs.length > 0) {
+    const untitled = await dialog.showMessageBox(win, {
+      type: 'warning',
+      buttons: ['取消', '丢弃未命名标签页'],
+      defaultId: 0,
+      cancelId: 0,
+      message: '还有未命名的标签页没有保存',
+      detail: '关闭窗口会丢掉它们里的内容。请先切到那些标签页保存。'
+    })
+    if (untitled.response === 0) return false
   }
 
   const saved = await saveToPath(win, filePath, snapshot.content, sourcePath, true)

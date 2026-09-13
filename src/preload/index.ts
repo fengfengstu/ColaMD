@@ -32,6 +32,9 @@ export interface ElectronAPI {
   showEntryContextMenu: (path: string, kind: 'file' | 'directory') => Promise<void>
   listSiblings: () => Promise<SiblingFile[] | null>
   openSibling: (path: string) => Promise<boolean>
+  activateFile: (path: string) => Promise<{ content: string; mtime: number } | null>
+  setTabFiles: (paths: string[]) => void
+  onFocusFile: (callback: (path: string) => void) => void
   saveFile: (content: string, expectedPath?: string, rebuildMenu?: boolean, autosave?: boolean) => Promise<string | null>
   saveFileAs: (content: string, expectedPath?: string) => Promise<string | null>
   exportPDF: () => Promise<boolean>
@@ -51,6 +54,8 @@ export interface ElectronAPI {
   onMenuOpen: (callback: () => void) => void
   onMenuSave: (callback: () => void) => void
   onMenuSaveAs: (callback: () => void) => void
+  onMenuNewTab: (callback: () => void) => void
+  onMenuCloseTab: (callback: () => void) => void
   onMenuExportPDF: (callback: () => void) => void
   onMenuExportHTML: (callback: () => void) => void
   onMenuExportDOCX: (callback: () => void) => void
@@ -78,7 +83,7 @@ export interface ElectronAPI {
   reportDirty: (isDirty: boolean) => void
   reportRendererReady: () => void
   onRequestDocumentState: (callback: (requestId: string) => void) => void
-  respondDocumentState: (requestId: string, snapshot: { dirty: boolean; content: string }) => void
+  respondDocumentState: (requestId: string, snapshot: { dirty: boolean; content: string; tabs?: { path: string | null; content: string }[] }) => void
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -89,6 +94,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showEntryContextMenu: (path: string, kind: 'file' | 'directory') => ipcRenderer.invoke('entry-context-menu', path, kind) as Promise<void>,
   listSiblings: () => ipcRenderer.invoke('list-siblings'),
   openSibling: (path: string) => ipcRenderer.invoke('open-sibling', path),
+  activateFile: (path: string) => ipcRenderer.invoke('activate-file', path) as Promise<{ content: string; mtime: number } | null>,
+  setTabFiles: (paths: string[]) => { ipcRenderer.send('set-tab-files', paths) },
+  onFocusFile: (callback: (path: string) => void) => {
+    ipcRenderer.on('focus-file', (_event, path: string) => callback(path))
+  },
   saveFile: (content: string, expectedPath?: string, rebuildMenu?: boolean, autosave?: boolean) => ipcRenderer.invoke('save-file', content, expectedPath, rebuildMenu, autosave),
   saveFileAs: (content: string, expectedPath?: string) => ipcRenderer.invoke('save-file-as', content, expectedPath),
   exportPDF: () => ipcRenderer.invoke('export-pdf'),
@@ -121,6 +131,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onMenuSave: (callback: () => void) => {
     ipcRenderer.on('menu-save', () => callback())
+  },
+  onMenuNewTab: (callback: () => void) => {
+    ipcRenderer.on('menu-new-tab', () => callback())
+  },
+  onMenuCloseTab: (callback: () => void) => {
+    ipcRenderer.on('menu-close-tab', () => callback())
   },
   onMenuSaveAs: (callback: () => void) => {
     ipcRenderer.on('menu-save-as', () => callback())
@@ -200,7 +216,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onRequestDocumentState: (callback: (requestId: string) => void) => {
     ipcRenderer.on('request-document-state', (_event, requestId) => callback(requestId))
   },
-  respondDocumentState: (requestId: string, snapshot: { dirty: boolean; content: string }) => {
+  respondDocumentState: (requestId: string, snapshot: { dirty: boolean; content: string; tabs?: { path: string | null; content: string }[] }) => {
     ipcRenderer.send('document-state-response', requestId, snapshot)
   }
 } satisfies ElectronAPI)

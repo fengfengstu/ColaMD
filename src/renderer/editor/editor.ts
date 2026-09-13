@@ -1,5 +1,5 @@
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx, serializerCtx, remarkPluginsCtx, remarkStringifyOptionsCtx } from '@milkdown/kit/core'
-import { Plugin, PluginKey } from '@milkdown/kit/prose/state'
+import { Plugin, PluginKey, type EditorState } from '@milkdown/kit/prose/state'
 import { Decoration, DecorationSet, type EditorView } from '@milkdown/kit/prose/view'
 import remarkBreaks from 'remark-breaks'
 import { commonmark } from '@milkdown/kit/preset/commonmark'
@@ -613,4 +613,19 @@ export function getEditorView(): EditorView | null {
     view = ctx.get(editorViewCtx)
   })
   return view
+}
+
+// Per-tab documents share one editor instance. The ProseMirror state carries the
+// document, the selection and the undo stack, so capturing it per tab is what
+// keeps each tab's own undo history instead of one shared stack.
+export function getEditorState(): EditorState | null {
+  const view = getEditorView()
+  return view ? view.state : null
+}
+
+// Restore a captured state. Used when switching back to a tab, which must not
+// go through Markdown, or the undo stack and the selection would be lost.
+export function restoreEditorState(state: EditorState): void {
+  const view = getEditorView()
+  if (view) view.updateState(state)
 }
