@@ -626,6 +626,15 @@ ipcMain.handle('entry-context-menu', (event, targetPath: unknown, kind: unknown)
   ]
   if (kind !== 'directory') {
     items.push({ label: zh ? '用默认应用打开' : 'Open in default app', click: () => { void shell.openPath(targetPath) } })
+    items.push({
+      label: zh ? '在新标签页打开' : 'Open in New Tab',
+      click: () => {
+        const state = getState(win)
+        // Tabs live in the renderer, so the menu only reports the intent.
+        if (state.filePath === targetPath) return
+        win.webContents.send('open-in-new-tab', targetPath)
+      }
+    })
   }
   items.push({
     label: manager === 'explorer' ? (zh ? '在资源管理器中显示' : 'Reveal in File Explorer') : (zh ? '在 Finder 中显示' : 'Reveal in Finder'),
@@ -759,6 +768,12 @@ ipcMain.handle('open-sibling', async (event, filePath: string) => {
       state.browsePath = filePath
       const files = await listSiblingFiles(state.filePath, filePath)
       if (!win.isDestroyed()) win.webContents.send('siblings-changed', files)
+      return true
+    }
+    // Already open in another tab of this window: focus that tab instead of
+    // loading the same file twice.
+    if (state.tabFiles.includes(filePath) && state.filePath !== filePath) {
+      win.webContents.send('focus-file', filePath)
       return true
     }
   } catch {

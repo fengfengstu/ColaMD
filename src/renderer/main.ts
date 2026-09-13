@@ -220,30 +220,82 @@ function markActiveTabDirty(): void {
   entry?.classList.toggle('dirty', dirty)
 }
 
+const TAB_BAR_HEIGHT = 36
+
+// The strip clips its own overflow, so the shortcut hint is a fixed layer that
+// the renderer positions under the close button on hover.
+function showTabTip(button: HTMLElement): void {
+  const tip = document.getElementById('tab-tip') as HTMLElement | null
+  if (!tip) return
+  tip.textContent = isChinese() ? '关闭标签页 · ⌘W' : 'Close tab · ⌘W'
+  tip.hidden = false
+  const rect = button.getBoundingClientRect()
+  const width = tip.offsetWidth
+  const left = Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8)
+  tip.style.left = `${Math.round(left)}px`
+  tip.style.top = `${Math.round(rect.bottom + 7)}px`
+}
+
+function hideTabTip(): void {
+  const tip = document.getElementById('tab-tip') as HTMLElement | null
+  if (tip) tip.hidden = true
+}
+// Space between the tab strip and the document, matching the editor's side
+// padding so the page does not start right under the tabs.
+const TAB_BAR_TOP_GAP = 34
+
+function closeGlyph(): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('width', '9')
+  svg.setAttribute('height', '9')
+  svg.setAttribute('viewBox', '0 0 9 9')
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('stroke', 'currentColor')
+  svg.setAttribute('stroke-width', '1.3')
+  svg.setAttribute('stroke-linecap', 'round')
+  for (const [x1, y1, x2, y2] of [['1.6', '1.6', '7.4', '7.4'], ['7.4', '1.6', '1.6', '7.4']]) {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1); line.setAttribute('x2', x2); line.setAttribute('y2', y2)
+    svg.append(line)
+  }
+  return svg
+}
+
 function renderTabBar(): void {
   captureActiveTab()
   const bar = tabBarEl()
   const visible = tabs.length > 1
   bar.hidden = !visible
-  document.documentElement.style.setProperty('--tab-bar-height', visible ? '34px' : '0px')
+  document.body.classList.toggle('has-tabs', visible)
+  document.documentElement.style.setProperty('--tab-bar-height', visible ? `${TAB_BAR_HEIGHT}px` : '0px')
+  document.documentElement.style.setProperty('--editor-top-gap', visible ? `${TAB_BAR_TOP_GAP}px` : '0px')
   bar.innerHTML = ''
   if (!visible) return
   for (const tab of tabs) {
-    const entry = document.createElement('button')
-    entry.type = 'button'
+    const entry = document.createElement('div')
     entry.className = 'tab-entry'
     entry.dataset.tabId = tab.id
+    entry.setAttribute('role', 'tab')
     entry.title = tab.filePath ?? tabLabel(tab)
-    if (tab.id === activeTabId) entry.classList.add('active')
+    if (tab.id === activeTabId) {
+      entry.classList.add('active')
+      entry.setAttribute('aria-selected', 'true')
+    }
     if (tab.dirty) entry.classList.add('dirty')
     const name = document.createElement('span')
     name.className = 'tab-entry-name'
     name.textContent = tabLabel(tab)
-    entry.append(name)
+    const close = document.createElement('button')
+    close.type = 'button'
+    close.className = 'tab-entry-close'
+    close.setAttribute('aria-label', isChinese() ? '关闭标签页' : 'Close tab')
+    close.append(closeGlyph())
+    entry.append(name, close)
     bar.append(entry)
   }
   const active = bar.querySelector('.tab-entry.active')
   active?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  hideTabTip()
   // Let the main process know which files this window holds in tabs, so opening
   // an already open document can focus that tab instead of duplicating it.
   window.electronAPI.setTabFiles(tabs.map((tab) => tab.filePath).filter((path): path is string => !!path))
@@ -398,18 +450,48 @@ function confirmDiscardUntitled(): boolean {
     : 'This tab has unsaved content. Close it anyway?')
 }
 
+// Open a file in a tab of its own. Reuses a blank current tab, and never opens
+// the same file twice: an already open document just gets focused.
+async function openFileInNewTab(path: string): Promise<void> {
+  const existing = tabs.find((tab) => tab.filePath === path)
+  if (existing) {
+    await activateTab(existing.id)
+    return
+  }
+  const current = activeTab()
+  if (current && !current.filePath && !current.dirty) {
+    await window.electronAPI.openSibling(path)
+    return
+  }
+  await openNewTab()
+  await window.electronAPI.openSibling(path)
+}
+
 function bindTabBar(api: import('../preload/index').ElectronAPI): void {
   newTabBtnEl().addEventListener('click', () => { void openNewTab() })
   api.onMenuNewTab(() => { void openNewTab() })
   api.onMenuCloseTab(() => { if (activeTabId) void closeTab(activeTabId) })
+  api.onOpenInNewTab((path) => { void openFileInNewTab(path) })
+  tabBarEl().addEventListener('mouseover', (e) => {
+    const close = (e.target as HTMLElement).closest('.tab-entry-close')
+    if (close) showTabTip(close as HTMLElement)
+    else hideTabTip()
+  })
+  tabBarEl().addEventListener('mouseleave', hideTabTip)
   api.onFocusFile((path) => {
     const tab = tabs.find((candidate) => candidate.filePath === path)
     if (tab) void activateTab(tab.id)
   })
   tabBarEl().addEventListener('click', (e) => {
-    const entry = (e.target as HTMLElement).closest('.tab-entry') as HTMLElement | null
+    const target = e.target as HTMLElement
+    const entry = target.closest('.tab-entry') as HTMLElement | null
     const id = entry?.dataset.tabId
-    if (id) void activateTab(id)
+    if (!id) return
+    if (target.closest('.tab-entry-close')) {
+      void closeTab(id)
+      return
+    }
+    void activateTab(id)
   })
   // Middle click closes, the browser convention; the bar stays free of a
   // permanent close affordance (design.md).
@@ -1114,6 +1196,11 @@ async function init(): Promise<void> {
     const btn = (e.target as HTMLElement).closest('button[data-path]') as HTMLButtonElement | null
     if (!btn || !btn.dataset.path) return
     if (btn.dataset.path === currentFilePath) return
+    // ⌘/Ctrl click opens the file in a tab of its own (design.md).
+    if (btn.dataset.kind === 'file' && (e.metaKey || e.ctrlKey)) {
+      await openFileInNewTab(btn.dataset.path)
+      return
+    }
     if (btn.dataset.kind === 'file' && dirty && !await saveCurrent()) return
     await api.openSibling(btn.dataset.path)
   })
@@ -1241,6 +1328,8 @@ async function init(): Promise<void> {
     searchPanel.setLanguage(language)
     setMathModalLanguage(language)
     updateUiLanguage()
+    // Tab labels and the close tooltip are built in the current language.
+    renderTabBar()
   })
   api.onExternalConflictResult((result) => {
     if (result.action === 'load' && typeof result.content === 'string') {
