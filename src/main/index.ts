@@ -625,11 +625,10 @@ ipcMain.handle('entry-context-menu', (event, targetPath: unknown, kind: unknown)
   if (!win || typeof targetPath !== 'string' || targetPath.length === 0) return
   const zh = getPreferredLanguage() === 'zh'
   const manager = fileManagerName()
-  const items: Electron.MenuItemConstructorOptions[] = [
-    { label: zh ? '复制路径' : 'Copy path', click: () => clipboard.writeText(targetPath) }
-  ]
+  const items: Electron.MenuItemConstructorOptions[] = []
   if (kind !== 'directory') {
-    items.push({ label: zh ? '用默认应用打开' : 'Open in default app', click: () => { void shell.openPath(targetPath) } })
+    // First item: opening a document in its own tab is the reason this menu is
+    // reached for (design.md).
     items.push({
       label: zh ? '在新标签页打开' : 'Open in New Tab',
       click: () => {
@@ -639,6 +638,11 @@ ipcMain.handle('entry-context-menu', (event, targetPath: unknown, kind: unknown)
         win.webContents.send('open-in-new-tab', targetPath)
       }
     })
+    items.push({ type: 'separator' })
+  }
+  items.push({ label: zh ? '复制路径' : 'Copy path', click: () => clipboard.writeText(targetPath) })
+  if (kind !== 'directory') {
+    items.push({ label: zh ? '用默认应用打开' : 'Open in default app', click: () => { void shell.openPath(targetPath) } })
   }
   items.push({
     label: manager === 'explorer' ? (zh ? '在资源管理器中显示' : 'Reveal in File Explorer') : (zh ? '在 Finder 中显示' : 'Reveal in Finder'),

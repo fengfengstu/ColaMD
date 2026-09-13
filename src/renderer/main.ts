@@ -177,7 +177,6 @@ let nextTabId = 1
 let switchingTab = false
 
 const tabBarEl = () => document.getElementById('tab-bar') as HTMLElement
-const newTabBtnEl = () => document.getElementById('new-tab-btn') as HTMLButtonElement
 
 function activeTab(): DocumentTab | null {
   return tabs.find((tab) => tab.id === activeTabId) ?? null
@@ -226,10 +225,10 @@ const TAB_BAR_HEIGHT = 36
 
 // The strip clips its own overflow, so the shortcut hint is a fixed layer that
 // the renderer positions under the close button on hover.
-function showTabTip(button: HTMLElement, text: string): void {
+function showTabTip(button: HTMLElement): void {
   const tip = document.getElementById('tab-tip') as HTMLElement | null
   if (!tip) return
-  tip.textContent = text
+  tip.textContent = isChinese() ? '关闭标签页 · ⌘W' : 'Close tab · ⌘W'
   tip.hidden = false
   const rect = button.getBoundingClientRect()
   const width = tip.offsetWidth
@@ -264,22 +263,6 @@ function closeGlyph(): SVGSVGElement {
 }
 
 // Same plus as the title bar button, at the tab strip's scale.
-function plusGlyph(): SVGSVGElement {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-  svg.setAttribute('width', '14')
-  svg.setAttribute('height', '14')
-  svg.setAttribute('viewBox', '0 0 16 16')
-  svg.setAttribute('fill', 'none')
-  svg.setAttribute('stroke', 'currentColor')
-  svg.setAttribute('stroke-width', '1.3')
-  svg.setAttribute('stroke-linecap', 'round')
-  for (const [x1, y1, x2, y2] of [['8', '3.1', '8', '12.9'], ['3.1', '8', '12.9', '8']]) {
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-    line.setAttribute('x1', x1); line.setAttribute('y1', y1); line.setAttribute('x2', x2); line.setAttribute('y2', y2)
-    svg.append(line)
-  }
-  return svg
-}
 
 function renderTabBar(): void {
   captureActiveTab()
@@ -313,16 +296,6 @@ function renderTabBar(): void {
     entry.append(name, close)
     bar.append(entry)
   }
-  // The plus lives at the end of the strip whenever the strip is there, so the
-  // title bar button (the only entry while no strip exists) can step aside:
-  // exactly one plus is on screen at any time.
-  const add = document.createElement('button')
-  add.type = 'button'
-  add.className = 'tab-new-btn'
-  add.dataset.newTab = 'true'
-  add.setAttribute('aria-label', isChinese() ? '新建标签页' : 'New tab')
-  add.append(plusGlyph())
-  bar.append(add)
   const active = bar.querySelector('.tab-entry.active')
   active?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   hideTabTip()
@@ -515,15 +488,13 @@ async function openFileInNewTab(path: string): Promise<void> {
 }
 
 function bindTabBar(api: import('../preload/index').ElectronAPI): void {
-  newTabBtnEl().addEventListener('click', () => { void openNewTab() })
+  // Tabs are created from the File menu / ⌘T, never from a button in the chrome.
   api.onMenuNewTab(() => { void openNewTab() })
   api.onMenuCloseTab(() => { if (activeTabId) void closeTab(activeTabId) })
   api.onOpenInNewTab((path) => { void openFileInNewTab(path) })
   tabBarEl().addEventListener('mouseover', (e) => {
-    const target = e.target as HTMLElement
-    const close = target.closest('.tab-entry-close')
-    if (close) showTabTip(close as HTMLElement, isChinese() ? '关闭标签页 · ⌘W' : 'Close tab · ⌘W')
-    else if (target.closest('.tab-new-btn')) showTabTip(target.closest('.tab-new-btn') as HTMLElement, isChinese() ? '新建标签页 · ⌘T' : 'New tab · ⌘T')
+    const close = (e.target as HTMLElement).closest('.tab-entry-close')
+    if (close) showTabTip(close as HTMLElement)
     else hideTabTip()
   })
   tabBarEl().addEventListener('mouseleave', hideTabTip)
@@ -533,10 +504,6 @@ function bindTabBar(api: import('../preload/index').ElectronAPI): void {
   })
   tabBarEl().addEventListener('click', (e) => {
     const target = e.target as HTMLElement
-    if (target.closest('.tab-new-btn')) {
-      void openNewTab()
-      return
-    }
     const entry = target.closest('.tab-entry') as HTMLElement | null
     const id = entry?.dataset.tabId
     if (!id) return

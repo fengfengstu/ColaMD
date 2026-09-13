@@ -94,31 +94,8 @@ body {
   opacity: 0.55;
 }
 
-#new-tab-btn {
-  position: absolute;
-  top: 6px;
-  right: 114px;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-app-region: no-drag;
-  transition: background 0.15s, color 0.15s;
-}
-
-#new-tab-btn:hover {
-  background: rgba(127, 127, 127, 0.14);
-  color: var(--text-color);
-}
-
-/* Tabs are created by the user (the + button or ⌘T). With one document there is
-   no bar and --tab-bar-height is 0, so the layout matches the pre-tab app. */
+/* Tabs are created from the File menu / ⌘T, or from the file list's right-click
+   menu (「在新标签页打开」). No permanent plus button: see design.md for why. */
 #tab-bar {
   height: var(--tab-bar-height, 0px);
   flex: none;
@@ -140,36 +117,6 @@ body {
 }
 
 #tab-bar::-webkit-scrollbar {
-  display: none;
-}
-
-/* The plus that closes the strip's work: it appears with the strip, and the title
-   bar's own plus steps aside, so there is never more than one on screen. */
-.tab-new-btn {
-  flex: none;
-  align-self: flex-end;
-  margin: 0 0 3px 4px;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: default;
-  -webkit-app-region: no-drag;
-  transition: background 0.12s, color 0.12s;
-}
-
-.tab-new-btn:hover {
-  background: var(--chrome-bg-hover);
-  color: var(--text-color);
-}
-
-body.has-tabs #new-tab-btn {
   display: none;
 }
 
