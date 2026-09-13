@@ -24,14 +24,13 @@ If ColaMD is useful to you, please give the project a ⭐ Star.
 ## Features
 
 *(Nine highlights. The full feature list lives in the [README](https://github.com/marswaveai/ColaMD#features).)*
-
 - **True WYSIWYG**: Type Markdown and see rich text directly. No split-pane preview, nothing to learn.
-- **Clean by Design**: No toolbar, no status bar, nothing to configure. Your text and a file list, plus a tab strip that appears only when you open a second document.
-- **Always in Sync**: When the file changes on disk (an AI agent, a script, another editor), the editor updates right away. No reopening, no manual refresh.
+- **Always in Sync**: When the file changes on disk, whether by an AI agent, a script or another editor, the editor updates right away. No reopening, no manual refresh.
+- **Export**: Turn a document into Word, PDF, a self-contained HTML file or a shareable image, with your theme colors kept.
 - **Tabs**: Keep several documents open in one window (⌘T opens a new tab). Each tab holds its own content, undo history and scroll position, and switching never mixes them.
+- **Diagrams**: Render Mermaid flowcharts and sequence diagrams right inside the document, with colors that follow your theme.
 - **Same-Directory Files**: Browse and switch between the Markdown files in the current folder, and drag the panel to the width you like. Files created by an agent appear automatically.
-- **Outline & Find**: Jump between headings with the current section highlighted, and search or replace inside the document.
-- **Export**: Turn a document into PDF, Word or a self-contained HTML file, with your theme colors kept.
+- **Outline & Find**: Never lose your place in a long document: jump between headings, see the current section highlighted, and find or replace inside the document.
 - **Rich Text Copy**: Copy content with formatting preserved into WeChat, email and other rich-text editors.
 - **Cross-Platform**: Available for macOS, Windows and Linux, with English and Chinese interfaces. Free and open source.
 
