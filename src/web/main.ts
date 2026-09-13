@@ -140,7 +140,11 @@ function setLang(next: Lang): void {
 
 function setFull(next: boolean): void {
   full = next
-  document.documentElement.classList.toggle('try-full', full)
+  const root = document.documentElement
+  root.classList.toggle('try-full', full)
+  // Standalone and full screen both put the whole thing in a centred window.
+  // The homepage block does not: the site's own window is the frame there.
+  root.classList.toggle('try-window', !EMBED || full)
   syncMaxButton()
 }
 
