@@ -119,6 +119,14 @@ body {
 
 /* Tabs are created by the user (the + button or ⌘T). With one document there is
    no bar and --tab-bar-height is 0, so the layout matches the pre-tab app. */
+/* One chrome surface for the title bar and the tab strip (X does the same): from
+   the top of the window down to the baseline it is a single block, the tabs are
+   plain labels on it, and the active one is marked by a hairline of accent colour
+   resting on the baseline. No chips, no borders, no shadow. */
+body.has-tabs #titlebar {
+  background: var(--chrome-bg);
+}
+
 #tab-bar {
   height: var(--tab-bar-height, 0px);
   flex: none;
@@ -130,8 +138,8 @@ body {
   overflow-y: hidden;
   scrollbar-width: none;
   background: var(--chrome-bg, transparent);
-  /* The strip's baseline runs under the whole bar, and the active tab (opaque
-     paper, flush with the bottom) cuts it out, so it opens into the document. */
+  /* A hairline along the baseline separates chrome from document; the active tab's
+     accent line rests on top of it. */
   box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--text-color) 11%, transparent);
 }
 
@@ -154,12 +162,9 @@ body {
   min-width: 30px;
   max-width: 190px;
   height: 30px;
-  /* Symmetric, so the filename sits centred in a tab that hugs it. 30px total,
-     the same as before, so the tab width does not change. */
+  /* Symmetric, so the filename sits centred in a tab that hugs it. */
   padding: 0 10px;
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: 9px 9px 0 0;
+  border: none;
   background: transparent;
   color: var(--text-muted);
   font-family: inherit;
@@ -177,13 +182,22 @@ body {
   color: var(--text-secondary, var(--text-color));
 }
 
-/* The active tab wears the paper colour with no bottom edge, so it opens into
-   the document instead of sitting on it as a separate chip. */
+/* The active tab is marked the way X marks a tab: the label at full strength plus
+   a thin accent line on the strip's baseline. The tab itself stays plain, so the
+   strip reads as one block. */
 .tab-entry.active {
-  background: var(--bg-color);
-  border-color: color-mix(in srgb, var(--text-color) 16%, transparent);
   color: var(--text-color);
-  box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.tab-entry.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  border-radius: 1px;
+  background: var(--link-color);
 }
 
 .tab-entry-name {
@@ -230,32 +244,18 @@ body {
   transition: opacity 0s, background 0.12s, color 0.12s;
 }
 
-.tab-entry.active .tab-entry-close {
-  background: var(--bg-color);
-}
-
 .tab-entry:hover .tab-entry-close,
-.tab-entry.active .tab-entry-close:focus-visible {
+.tab-entry-close:focus-visible {
   opacity: 1;
   pointer-events: auto;
-  /* A resting tab's surface fades in over 0.15s: wait for it, so the opaque mask
+  /* A tab's hover surface fades in over 0.15s: wait for it, so the opaque mask
      never lands on a half-transparent tab. */
   transition: opacity 0s 0.15s, background 0.12s, color 0.12s;
-}
-
-/* The active tab's surface never changes, so its close button appears at once. */
-.tab-entry.active:hover .tab-entry-close,
-.tab-entry.active .tab-entry-close:focus-visible {
-  transition: opacity 0s, background 0.12s, color 0.12s;
 }
 
 .tab-entry-close:hover {
   background: color-mix(in srgb, var(--text-color) 14%, var(--chrome-bg-hover));
   color: var(--text-color);
-}
-
-.tab-entry.active .tab-entry-close:hover {
-  background: color-mix(in srgb, var(--text-color) 12%, var(--bg-color));
 }
 
 /* The strip clips its own overflow, so the shortcut hint lives in a fixed layer
@@ -448,6 +448,10 @@ body {
   height: calc(100vh - 40px - var(--tab-bar-height, 0px));
   overflow-y: auto;
   padding: var(--editor-top-gap, 0px) 40px 40px;
+  /* Column layout so the page below fills exactly what is left of the window:
+     an empty document then has nothing to scroll and no scrollbar. */
+  display: flex;
+  flex-direction: column;
 }
 
 #source-editor {
@@ -724,7 +728,9 @@ body.show-file-panel #source-editor {
   outline: none;
   max-width: 780px;
   margin: 0 auto;
-  min-height: calc(100vh - 92px);
+  /* Fills the visible area, grows with the text. No hard-coded viewport sums:
+     those went stale every time the title bar or the tab strip changed height. */
+  flex: 1 0 auto;
   font-size: 16px;
   line-height: 1.75;
   color: var(--text-color);
@@ -1059,22 +1065,27 @@ body.theme-elegant #editor .ProseMirror table td {
   border-right: none;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
+/* Scrollbar: macOS keeps its native overlay bars, which are drawn while you
+   scroll, take no layout space and are absent the rest of the time. Only Windows
+   and Linux get the thin custom bar below. Chromium never repaints a custom
+   scrollbar on hover, so a "reveal the thumb on :hover" rule paints nothing
+   (verified on the tab bar and the editor): the honest options are the system
+   overlay bars or an always-on bar. */
+body.platform-non-mac *::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-::-webkit-scrollbar-track {
+body.platform-non-mac *::-webkit-scrollbar-track {
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
+body.platform-non-mac *::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 3px;
 }
 
-::-webkit-scrollbar-corner {
+body.platform-non-mac *::-webkit-scrollbar-corner {
   background: var(--bg-color);
 }
 

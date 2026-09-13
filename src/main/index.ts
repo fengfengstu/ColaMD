@@ -129,13 +129,17 @@ function pushRecentFile(filePath: string, rebuildMenu = false): void {
   persistRecentStore()
   // NEVER rebuild the menu from the autosave path: setApplicationMenu during
   // typing cancels the macOS IME composition and loses in-flight characters.
-  // macOS keeps recents live via the native recentDocuments role instead;
-  // other platforms only refresh the menu on user-initiated saves/opens.
+  // The File menu draws from recentStore on every platform now; macOS additionally
+  // gets the file in its own recent list, which feeds the Dock menu.
   if (process.platform === 'darwin') {
     app.addRecentDocument(filePath)
   } else if (rebuildMenu) {
     buildMenu()
   }
+}
+
+function recentFiles(): string[] {
+  return recentStore.recent.filter((p) => existsSync(p)).slice(0, 10)
 }
 
 function clearRecentFiles(): void {
@@ -1298,7 +1302,7 @@ function buildMenu(): void {
         file: '文件', edit: '编辑', view: '视图', theme: '主题', help: '帮助',
         newFile: '新建', open: '打开...', save: '保存', saveAs: '另存为...',
         newTab: '新建标签页', closeTab: '关闭标签页',
-        recentOpen: '最近打开', restoreOnLaunch: '启动时打开上次文档', clearRecent: '清除最近记录',
+        recentOpen: '最近打开', restoreOnLaunch: '启动时打开上次文档', clearRecent: '清除最近记录', noRecent: '没有最近打开的文件',
         exportPDF: '导出 PDF...', exportHTML: '导出 HTML...', exportWord: '导出 Word...', exportImageDesktop: '导出图片（电脑阅读）...', exportImageMobile: '导出图片（手机阅读）...', find: '查找',
         setDefault: '设置为默认应用...',
         insertFormula: '插入公式', filePanel: '显示 / 隐藏文件列表', sourceMode: '切换 Markdown 源码',
@@ -1317,7 +1321,7 @@ function buildMenu(): void {
         file: 'File', edit: 'Edit', view: 'View', theme: 'Theme', help: 'Help',
         newFile: 'New', open: 'Open...', save: 'Save', saveAs: 'Save As...',
         newTab: 'New Tab', closeTab: 'Close Tab',
-        recentOpen: 'Open Recent', restoreOnLaunch: 'Reopen last document at launch', clearRecent: 'Clear Recent',
+        recentOpen: 'Open Recent', restoreOnLaunch: 'Reopen last document at launch', clearRecent: 'Clear Recent', noRecent: 'No recent files',
         exportPDF: 'Export PDF...', exportHTML: 'Export HTML...', exportWord: 'Export Word...', exportImageDesktop: 'Export Image (Desktop)...', exportImageMobile: 'Export Image (Mobile)...', find: 'Find',
         setDefault: 'Set as Default...',
         insertFormula: 'Insert Formula', filePanel: 'Show / Hide File List', sourceMode: 'Toggle Markdown Source',
@@ -1397,20 +1401,15 @@ function buildMenu(): void {
           click: () => sendToFocused('menu-open')
         },
         {
-          ...(process.platform === 'darwin'
-            ? {
-                role: 'recentDocuments' as const,
-                submenu: [{ role: 'clearRecentDocuments' as const }]
-              }
-            : {
-                label: labels.recentOpen,
-                submenu: [
-                  ...recentStore.recent.filter((p) => existsSync(p)).slice(0, 10).map((p, index) => ({
-                    label: `${index + 1}. ${basename(p)}`,
-                    click: () => openFile(p)
-                  }))
-                ]
-              })
+          label: labels.recentOpen,
+          // Our own label and submenu on every platform: the recentDocuments role
+          // draws a clock icon and an English label, which no other menu item has.
+          submenu: recentFiles().length
+            ? recentFiles().map((p, index) => ({
+                label: `${index + 1}. ${basename(p)}`,
+                click: () => openFile(p)
+              }))
+            : [{ label: labels.noRecent, enabled: false }]
         },
         {
           label: labels.restoreOnLaunch,

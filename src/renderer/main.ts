@@ -1169,6 +1169,10 @@ async function exportCurrentImage(preset: 'desktop' | 'mobile'): Promise<void> {
 
 async function init(): Promise<void> {
   const api = window.electronAPI
+  // macOS keeps its own overlay scrollbars (drawn while you scroll, no layout
+  // space, never in the way). The thin custom scrollbar is only for Windows and
+  // Linux, where the platform default is a chunky always-on bar.
+  if (!/^Mac/i.test(navigator.platform)) document.body.classList.add('platform-non-mac')
   const language = await api.getLanguage()
   fileManagerName = await api.getFileManagerName()
   setUiLanguage(language)
