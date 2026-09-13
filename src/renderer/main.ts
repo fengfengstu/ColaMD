@@ -222,9 +222,14 @@ function markActiveTabDirty(): void {
 }
 
 const TAB_BAR_HEIGHT = 36
+// The tab hint waits before it appears: hovering a tab is usually a prelude to
+// clicking it, and a label that jumps out immediately is noise.
+const TAB_TIP_DELAY = 1000
+
+let tabTipTimer: ReturnType<typeof setTimeout> | undefined
 
 // The strip clips its own overflow, so the shortcut hint is a fixed layer that
-// the renderer positions under the close button on hover.
+// the renderer positions under the tab on hover.
 function showTabTip(button: HTMLElement, text: string): void {
   const tip = document.getElementById('tab-tip') as HTMLElement | null
   if (!tip) return
@@ -237,7 +242,24 @@ function showTabTip(button: HTMLElement, text: string): void {
   tip.style.top = `${Math.round(rect.bottom + 7)}px`
 }
 
+function scheduleTabTip(button: HTMLElement, text: string): void {
+  clearTimeout(tabTipTimer)
+  tabTipTimer = setTimeout(() => showTabTip(button, text), TAB_TIP_DELAY)
+}
+
+// A tab whose name fits says nothing but the shortcut; only a truncated name is
+// worth spelling out. The full path never appears on hover: it was the system
+// tooltip, and it reads as an accident.
+function tabTipText(entry: HTMLElement): string {
+  const shortcut = '⌘W'
+  const name = entry.querySelector('.tab-entry-name') as HTMLElement | null
+  const full = entry.dataset.fullName ?? ''
+  if (!name || !full) return shortcut
+  return name.scrollWidth > name.clientWidth + 1 ? `${full} · ${shortcut}` : shortcut
+}
+
 function hideTabTip(): void {
+  clearTimeout(tabTipTimer)
   const tip = document.getElementById('tab-tip') as HTMLElement | null
   if (tip) tip.hidden = true
 }
@@ -297,7 +319,7 @@ function renderTabBar(): void {
     entry.className = 'tab-entry'
     entry.dataset.tabId = tab.id
     entry.setAttribute('role', 'tab')
-    entry.title = tab.filePath ?? tabLabel(tab)
+    entry.dataset.fullName = tabLabel(tab)
     if (tab.id === activeTabId) {
       entry.classList.add('active')
       entry.setAttribute('aria-selected', 'true')
@@ -513,20 +535,54 @@ async function openFileInNewTab(path: string): Promise<void> {
   await window.electronAPI.openSibling(path)
 }
 
+// Closing several tabs runs one at a time: each close may need its own unsaved
+// confirmation, and a cancelled one stops the rest.
+async function closeTabsMatching(keep: (index: number) => boolean): Promise<void> {
+  for (;;) {
+    const index = tabs.findIndex((_tab, i) => keep(i))
+    if (index < 0) return
+    const before = tabs.length
+    await closeTab(tabs[index].id)
+    if (tabs.length === before) return
+  }
+}
+
 function bindTabBar(api: import('../preload/index').ElectronAPI): void {
   // Tabs are also created from the File menu / ⌘T and from the file list; the
   // strip's own plus is bound above, in renderTabBar.
   api.onMenuNewTab(() => { void openNewTab() })
   api.onMenuCloseTab(() => { if (activeTabId) void closeTab(activeTabId) })
   api.onOpenInNewTab((path) => { void openFileInNewTab(path) })
+  const handleTabMenuAction = ({ action, tabId }: { action: string; tabId: string }) => {
+    if (action === 'close') { void closeTab(tabId); return }
+    if (action === 'close-others') { void closeTabsMatching((i) => tabs[i].id !== tabId); return }
+    if (action === 'close-right') {
+      void closeTabsMatching((i) => i > tabs.findIndex((tab) => tab.id === tabId))
+    }
+  }
+  api.onTabMenuAction(handleTabMenuAction)
   tabBarEl().addEventListener('mouseover', (e) => {
     const target = e.target as HTMLElement
-    const close = target.closest('.tab-entry-close')
-    if (close) showTabTip(close as HTMLElement, isChinese() ? '关闭标签页 · ⌘W' : 'Close tab · ⌘W')
-    else if (target.closest('.tab-new-btn')) showTabTip(target.closest('.tab-new-btn') as HTMLElement, isChinese() ? '新建标签页 · ⌘T' : 'New tab · ⌘T')
+    const entry = target.closest('.tab-entry') as HTMLElement | null
+    if (entry) scheduleTabTip(entry, tabTipText(entry))
+    else if (target.closest('.tab-new-btn')) scheduleTabTip(target.closest('.tab-new-btn') as HTMLElement, isChinese() ? '新建标签页 · ⌘T' : 'New tab · ⌘T')
     else hideTabTip()
   })
   tabBarEl().addEventListener('mouseleave', hideTabTip)
+  tabBarEl().addEventListener('contextmenu', (e) => {
+    const entry = (e.target as HTMLElement).closest('.tab-entry') as HTMLElement | null
+    const id = entry?.dataset.tabId
+    if (!id) return
+    const index = tabs.findIndex((tab) => tab.id === id)
+    if (index < 0) return
+    e.preventDefault()
+    void api.showTabContextMenu({
+      tabId: id,
+      filePath: tabs[index].filePath,
+      canCloseOthers: tabs.length > 1,
+      canCloseRight: index < tabs.length - 1
+    })
+  })
   api.onFocusFile((path) => {
     const tab = tabs.find((candidate) => candidate.filePath === path)
     if (tab) void activateTab(tab.id)

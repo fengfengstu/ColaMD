@@ -618,13 +618,44 @@ function fileManagerName(): 'finder' | 'explorer' | 'file-manager' {
   return 'file-manager'
 }
 
+function revealLabel(zh: boolean): string {
+  return fileManagerName() === 'explorer'
+    ? (zh ? '在资源管理器中显示' : 'Reveal in File Explorer')
+    : (zh ? '在 Finder 中显示' : 'Reveal in Finder')
+}
+
+// Right-click menu for a tab: the closing actions, plus the path actions that
+// make sense for the document in it. Same native menu as the file list.
+ipcMain.handle('tab-context-menu', (event, payload: unknown) => {
+  const win = getWinFromEvent(event)
+  if (!win || typeof payload !== 'object' || payload === null) return
+  const { tabId, filePath, canCloseOthers, canCloseRight } = payload as Record<string, unknown>
+  if (typeof tabId !== 'string' || tabId.length === 0) return
+  const zh = getPreferredLanguage() === 'zh'
+  const send = (action: string) => win.webContents.send('tab-menu-action', { action, tabId })
+  const items: Electron.MenuItemConstructorOptions[] = [
+    { label: zh ? '关闭' : 'Close', click: () => send('close') }
+  ]
+  if (canCloseOthers === true) {
+    items.push({ label: zh ? '关闭其他标签页' : 'Close Other Tabs', click: () => send('close-others') })
+  }
+  if (canCloseRight === true) {
+    items.push({ label: zh ? '关闭右侧标签页' : 'Close Tabs to the Right', click: () => send('close-right') })
+  }
+  if (typeof filePath === 'string' && filePath.length > 0) {
+    items.push({ type: 'separator' })
+    items.push({ label: zh ? '复制路径' : 'Copy path', click: () => clipboard.writeText(filePath) })
+    items.push({ label: revealLabel(zh), click: () => shell.showItemInFolder(filePath) })
+  }
+  Menu.buildFromTemplate(items).popup({ window: win })
+})
+
 // Right-click menu for a file panel entry. Native menu on purpose: no custom
 // popup to theme, keep it accessible and platform familiar.
 ipcMain.handle('entry-context-menu', (event, targetPath: unknown, kind: unknown) => {
   const win = getWinFromEvent(event)
   if (!win || typeof targetPath !== 'string' || targetPath.length === 0) return
   const zh = getPreferredLanguage() === 'zh'
-  const manager = fileManagerName()
   const items: Electron.MenuItemConstructorOptions[] = []
   if (kind !== 'directory') {
     // First item: opening a document in its own tab is the reason this menu is
@@ -645,7 +676,7 @@ ipcMain.handle('entry-context-menu', (event, targetPath: unknown, kind: unknown)
     items.push({ label: zh ? '用默认应用打开' : 'Open in default app', click: () => { void shell.openPath(targetPath) } })
   }
   items.push({
-    label: manager === 'explorer' ? (zh ? '在资源管理器中显示' : 'Reveal in File Explorer') : (zh ? '在 Finder 中显示' : 'Reveal in Finder'),
+    label: revealLabel(zh),
     click: () => shell.showItemInFolder(targetPath)
   })
   Menu.buildFromTemplate(items).popup({ window: win })
