@@ -723,23 +723,35 @@ ipcMain.handle('open-file-path', async (event, filePath: string) => {
 // Tabs keep their own editor state in the renderer, so this only re-points what
 // belongs to the window: watcher, title, recent list and file panel. The disk
 // version is returned so the caller can tell whether it changed while this tab
-// was in the background.
+// was in the background. Passing null (or an empty string) means the active
+// document is untitled, which must clear the window's file binding: otherwise a
+// save of that untitled document would be written into the previous file.
 ipcMain.handle('activate-file', async (event, filePath: unknown) => {
   const win = getWinFromEvent(event)
-  if (!win || typeof filePath !== 'string' || filePath.length === 0) return null
+  if (!win) return null
+  if (filePath !== null && filePath !== '' && typeof filePath !== 'string') return null
+  const target = typeof filePath === 'string' && filePath.length > 0 ? filePath : null
   const state = getState(win)
   const operation = async (): Promise<{ content: string; mtime: number } | null> => {
+    if (!target) {
+      stopWatching(state)
+      state.filePath = null
+      state.lastInternalSaveContent = null
+      state.lastKnownMtime = 0
+      updateTitle(win)
+      return null
+    }
     try {
-      const data = await readFile(filePath, 'utf-8')
+      const data = await readFile(target, 'utf-8')
       if (win.isDestroyed()) return null
-      state.filePath = filePath
-      state.browsePath = dirname(filePath)
+      state.filePath = target
+      state.browsePath = dirname(target)
       state.lastInternalSaveContent = data
-      state.lastKnownMtime = fileMtimeMs(filePath)
+      state.lastKnownMtime = fileMtimeMs(target)
       watchFile(win, state)
       updateTitle(win)
-      pushRecentFile(filePath, true)
-      return { content: resolveImagePaths(data, filePath), mtime: state.lastKnownMtime }
+      pushRecentFile(target, true)
+      return { content: resolveImagePaths(data, target), mtime: state.lastKnownMtime }
     } catch {
       return null
     }
@@ -795,9 +807,10 @@ ipcMain.handle('save-file', async (event, content: string, expectedPath?: string
   if (!win) return null
   const state = getState(win)
   const sourcePath = state.filePath
-  // A queued auto-save must never write an old document into a file opened
-  // after the save was scheduled.
-  if (expectedPath && sourcePath !== expectedPath) return null
+  // The caller states which document this content belongs to; '' means untitled.
+  // Comparing strictly (rather than only when a path is given) is what stops a
+  // save from landing in whatever file the window happened to open last.
+  if (typeof expectedPath === 'string' && sourcePath !== (expectedPath.length > 0 ? expectedPath : null)) return null
   let filePath = sourcePath
   if (!filePath) {
     const result = await dialog.showSaveDialog(win, {
@@ -826,7 +839,7 @@ ipcMain.handle('save-file-as', async (event, content: string, expectedPath?: str
   const win = getWinFromEvent(event)
   if (!win) return null
   const sourcePath = getState(win).filePath
-  if (expectedPath && sourcePath !== expectedPath) return null
+  if (typeof expectedPath === 'string' && sourcePath !== (expectedPath.length > 0 ? expectedPath : null)) return null
   const result = await dialog.showSaveDialog(win, {
     defaultPath: suggestSavePath(win, suggestFileName(win, content)),
     filters: [

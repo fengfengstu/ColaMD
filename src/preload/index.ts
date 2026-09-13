@@ -32,7 +32,7 @@ export interface ElectronAPI {
   showEntryContextMenu: (path: string, kind: 'file' | 'directory') => Promise<void>
   listSiblings: () => Promise<SiblingFile[] | null>
   openSibling: (path: string) => Promise<boolean>
-  activateFile: (path: string) => Promise<{ content: string; mtime: number } | null>
+  activateFile: (path: string | null) => Promise<{ content: string; mtime: number } | null>
   setTabFiles: (paths: string[]) => void
   onFocusFile: (callback: (path: string) => void) => void
   onOpenInNewTab: (callback: (path: string) => void) => void
@@ -95,7 +95,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showEntryContextMenu: (path: string, kind: 'file' | 'directory') => ipcRenderer.invoke('entry-context-menu', path, kind) as Promise<void>,
   listSiblings: () => ipcRenderer.invoke('list-siblings'),
   openSibling: (path: string) => ipcRenderer.invoke('open-sibling', path),
-  activateFile: (path: string) => ipcRenderer.invoke('activate-file', path) as Promise<{ content: string; mtime: number } | null>,
+  activateFile: (path: string | null) => ipcRenderer.invoke('activate-file', path) as Promise<{ content: string; mtime: number } | null>,
   setTabFiles: (paths: string[]) => { ipcRenderer.send('set-tab-files', paths) },
   onFocusFile: (callback: (path: string) => void) => {
     ipcRenderer.on('focus-file', (_event, path: string) => callback(path))

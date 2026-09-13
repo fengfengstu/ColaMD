@@ -197,7 +197,8 @@ function tabLabel(tab: DocumentTab): string {
 function captureActiveTab(): void {
   const tab = activeTab()
   if (!tab) return
-  tab.filePath = currentFilePath
+  // The path is the tab's identity and only changes where a document is really
+  // opened or saved; deriving it here would let a stray render rename a tab.
   tab.dirty = dirty
   tab.revision = documentRevision
   tab.sourceMode = sourceModeActive
@@ -350,6 +351,9 @@ async function openNewTab(): Promise<void> {
   tabs.push(tab)
   activeTabId = tab.id
   currentFilePath = null
+  // Tell the main process the window is now on an untitled document, otherwise
+  // its notion of the active file still points at the previous tab's file.
+  await window.electronAPI.activateFile(null)
   showBlankDocument()
   renderTabBar()
 }
@@ -365,8 +369,9 @@ async function activateTab(id: string): Promise<void> {
   try {
     // Point the window at the incoming document first: this re-points the file
     // watcher, the title and the recent list, and reports whether the file
-    // changed while this tab sat in the background.
-    const disk = target.filePath ? await window.electronAPI.activateFile(target.filePath) : null
+    // changed while this tab sat in the background. An untitled tab passes null
+    // so the window stops pointing at the tab we are leaving.
+    const disk = await window.electronAPI.activateFile(target.filePath)
     // This document may have been written in a different style than the one we
     // are leaving; restore its own serialiser style with its content.
     applyMarkdownStyle(detectMarkdownStyle(target.content))
@@ -595,9 +600,11 @@ async function saveCurrent(saveAs = false): Promise<boolean> {
   const revision = documentRevision
   const content = getContent()
   const expectedPath = currentFilePath
+  // '' states plainly that the active document is untitled, so a save can never
+  // be written into a file the window happens to have open in another tab.
   const path = await enqueueSave(() => saveAs
-    ? window.electronAPI.saveFileAs(content, expectedPath ?? undefined)
-    : window.electronAPI.saveFile(content, expectedPath ?? undefined, true))
+    ? window.electronAPI.saveFileAs(content, expectedPath ?? '')
+    : window.electronAPI.saveFile(content, expectedPath ?? '', true))
   if (!path || currentFilePath !== expectedPath) return false
 
   currentFilePath = path

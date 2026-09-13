@@ -327,7 +327,10 @@ body {
   color: var(--text-muted);
 }
 
-#titlebar:hover #reveal-file-btn:not(:disabled),
+/* Reveal on hovering the title itself (or the button), never when the pointer is
+   over the right-hand actions: those are unrelated controls and the extra icon
+   appearing out there is noise (design.md). */
+#title-center:hover #reveal-file-btn:not(:disabled),
 #reveal-file-btn:focus-visible {
   opacity: 1;
   pointer-events: auto;
