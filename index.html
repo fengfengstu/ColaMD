@@ -71,7 +71,7 @@
   .language-toggle { cursor: pointer; border: 0; background: transparent; padding: 0; }
   .language-toggle:hover { color: var(--accent); }
 
-  .hero { min-height: 680px; padding: 102px 0 116px; display: grid; grid-template-columns: minmax(280px, 0.85fr) minmax(400px, 1.15fr); gap: 70px; align-items: center; }
+  .hero { min-height: 680px; padding: 56px 0 104px; display: grid; grid-template-columns: minmax(280px, 0.85fr) minmax(400px, 1.15fr); gap: 70px; align-items: center; }
   .kicker, .eyebrow { color: var(--accent); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
   .hero h1 { margin-top: 22px; font-size: clamp(3.6rem, 6vw, 6.2rem); font-weight: 700; letter-spacing: -0.075em; line-height: 1.22; }
   .hero h1 em, .manifesto h2 em { color: var(--accent); font-style: normal; }
@@ -91,37 +91,24 @@
   .btn-ghost:hover { color: var(--accent); border-color: var(--accent); }
   .hero-meta { margin-top: 27px; color: var(--faint); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 0.7rem; letter-spacing: 0.03em; }
 
-  .editor-window { position: relative; transform: translateY(24px) rotate(1.2deg); }
+  .editor-window { position: relative; }
   .editor-window::before { content: ''; position: absolute; inset: 24px -18px -22px 22px; border: 1px solid var(--line); border-radius: 14px; transform: rotate(-2.4deg); }
   .window { position: relative; overflow: hidden; border: 1px solid #d8d3ce; border-radius: 12px; background: #f0edea; box-shadow: 0 26px 55px var(--shadow); }
   .window-bar { height: 43px; display: flex; align-items: center; gap: 7px; padding: 0 16px; border-bottom: 1px solid #d8d3ce; background: #e8e4df; }
   .window-dot { width: 8px; height: 8px; border-radius: 50%; background: #cfc6bd; }
   .window-dot:first-child { background: #d38168; }
   .window-title { margin-left: 9px; color: var(--faint); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 0.68rem; }
-  .window-body { min-height: 350px; display: grid; grid-template-columns: 145px 1fr; background: #f0edea; }
-  .file-list { padding: 23px 14px; border-right: 1px solid #d8d3ce; background: #eae6e1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-  .file-label { margin: 0 8px 14px; color: var(--faint); font-size: 0.61rem; font-weight: 700; letter-spacing: 0.12em; }
-  .file { overflow: hidden; margin: 3px 0; padding: 7px 8px; border-radius: 5px; color: var(--muted); font-size: 0.72rem; text-overflow: ellipsis; white-space: nowrap; }
-  .file.active { background: #f0d9a8; color: #2c2c2c; font-weight: 600; }
-  .file::before { content: '·'; margin-right: 7px; color: var(--accent); font-weight: 700; }
-  .document { padding: 26px 31px 28px; color: #2c2c2c; font-family: Georgia, 'Songti SC', 'Noto Serif SC', serif; }
-  .document-meta { display: flex; align-items: center; justify-content: space-between; color: #777; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 0.63rem; }
-  .sync { color: #6f8d6d; font-weight: 700; letter-spacing: 0.04em; }
-  .sync::before { content: '●'; margin-right: 5px; font-size: 0.55rem; }
-  .document h2 { margin-top: 29px; color: #2c2c2c; font-size: 1.72rem; letter-spacing: -0.04em; line-height: 1.15; }
-  .document .lead { margin-top: 12px; color: #777; font-size: 0.82rem; line-height: 1.9; }
-  .document h3 { margin-top: 20px; color: #c44b2b; font-size: 0.87rem; }
-  .document ul { margin: 8px 0 0 17px; color: #777; font-size: 0.78rem; line-height: 1.9; }
-  .heading-sample { margin-top: 8px; line-height: 1.3; }
-  .heading-sample .sample-h1 { font-size: 0.98rem; font-weight: 700; }
-  .heading-sample .sample-h2 { font-size: 0.86rem; font-weight: 700; }
-  .heading-sample .sample-h3 { color: var(--accent); font-size: 0.76rem; font-weight: 700; }
-  .source { display: inline-block; margin-top: 7px; border-radius: 5px; padding: 3px 7px; color: #777; background: #e8e4df; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.58rem; line-height: 1.45; }
-  .sample-render { margin-top: 8px; color: #777; font-size: 0.78rem; }
-  .sample-render strong { color: #c44b2b; }
-  .sample-render mark { padding: 0 2px; background: #f0d9a8; color: #2c2c2c; }
-  .document .cursor { display: inline-block; width: 1px; height: 0.9em; margin-left: 2px; vertical-align: -0.1em; background: var(--accent); animation: blink 1.2s infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
+  .window-body { position: relative; height: 350px; background: #f0edea; }
+  .window-body iframe { display: block; width: 100%; height: 100%; border: 0; background: #f0edea; }
+
+  /* 体验块自己管内部布局；首页只负责在它要求全屏时，把这个窗口铺满视口。
+     点「全屏」不换页面、不重载，用户刚写的字还在。 */
+  html.try-fullscreen { overflow: hidden; }
+  html.try-fullscreen .editor-window { position: fixed; inset: 0; z-index: 200; transform: none; }
+  html.try-fullscreen .editor-window::before { display: none; }
+  html.try-fullscreen .window { height: 100%; border: 0; border-radius: 0; box-shadow: none; }
+  html.try-fullscreen .window-bar { display: none; }
+  html.try-fullscreen .window-body { height: 100%; }
 
   section { border-top: 1px solid var(--line); }
   .manifesto { padding: 94px 0 102px; display: block; }
@@ -174,10 +161,10 @@
 
   @media (max-width: 860px) {
     .container { padding: 0 30px; }
-    .hero { grid-template-columns: 1fr; gap: 50px; padding: 82px 0 92px; }
-    .editor-window { max-width: 620px; width: 100%; justify-self: center; transform: rotate(1.2deg); }
-    /* 窄屏时装饰框少伸出去一点：它原本向右伸出 18px，叠上旋转会顶出屏幕，让整页能左右晃动。
-       18px → 6px → 3px 都还差一点（6px 时 375 溢 2px；3px 时 320 溢 2px），收到 1px 才彻底归零。 */
+    .hero { grid-template-columns: 1fr; gap: 46px; padding: 40px 0 84px; }
+    .editor-window { max-width: 620px; width: 100%; justify-self: center; }
+    /* 窄屏时装饰框要收住：它自己旋转 -2.4 度，一个 370px 宽的面转过来右侧会多吃约
+       7px，所以这里只留 1px 溢出量。留 18px 时整页会多出 2px，能左右晃动。 */
     .editor-window::before { inset: 24px -1px -22px 22px; }
     .manifesto .copy { gap: 36px; }
     .theme-grid { grid-template-columns: repeat(3, 1fr); }
@@ -190,10 +177,7 @@
     .hero h1 { font-size: 3.8rem; }
     .hero .subtitle { font-size: 1.18rem; }
     .editor-window { max-width: 100%; }
-    .window-body { grid-template-columns: 104px 1fr; }
-    .file-list { padding: 18px 8px; }
-    .document { padding: 22px 18px; }
-    .document h2 { font-size: 1.42rem; }
+    .window-body { height: 260px; }
     .manifesto { padding: 66px 0 74px; }
     .manifesto .copy { display: block; margin-top: 25px; }
     .manifesto .copy p + p { margin-top: 17px; }
@@ -228,8 +212,7 @@
       <div class="window">
         <div class="window-bar"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span><span class="window-title">ColaMD</span></div>
         <div class="window-body">
-          <aside class="file-list"><div class="file-label" data-en="FILES" data-zh="文件">FILES</div><div class="file">readme.md</div><div class="file">notes.md</div><div class="file active">markdown.md</div><div class="file">tasks.md</div></aside>
-          <article class="document"><div class="document-meta"><span>markdown.md</span><span class="sync">SYNCED</span></div><h2 data-en="Markdown Syntax Cheat Sheet" data-zh="Markdown 语法">Markdown Syntax Cheat Sheet</h2><p class="lead" data-en="ColaMD supports these Markdown formats. See the source below each example." data-zh="ColaMD 支持下面这些 Markdown 格式。每个示例下方是它的源码写法。">ColaMD supports these Markdown formats. See the source below each example.</p><h3 data-en="Headings" data-zh="标题">Headings</h3><div class="heading-sample"><div class="sample-h1" data-en="Heading 1" data-zh="一级标题">Heading 1</div><div class="sample-h2" data-en="Heading 2" data-zh="二级标题">Heading 2</div><div class="sample-h3" data-en="Heading 3" data-zh="三级标题">Heading 3</div></div><div class="source" data-en="Source: # Heading 1 · ## Heading 2 · ### Heading 3" data-zh="源码：# 一级标题 · ## 二级标题 · ### 三级标题">Source: # Heading 1 · ## Heading 2 · ### Heading 3</div><h3 data-en="Emphasis" data-zh="强调">Emphasis</h3><div class="sample-render" data-en-html="&lt;strong&gt;Bold&lt;/strong&gt;, &lt;em&gt;Italic&lt;/em&gt;, &lt;del&gt;Strike&lt;/del&gt;, &lt;mark&gt;Highlight&lt;/mark&gt;" data-zh-html="&lt;strong&gt;加粗&lt;/strong&gt;、&lt;em&gt;斜体&lt;/em&gt;、&lt;del&gt;删除线&lt;/del&gt;、&lt;mark&gt;高亮&lt;/mark&gt;"><strong>Bold</strong>, <em>Italic</em>, <del>Strike</del>, <mark>Highlight</mark></div><div class="source" data-en="Source: **Bold** · *Italic* · ~~Strike~~ · ==Highlight==" data-zh="源码：**加粗** · *斜体* · ~~删除线~~ · ==高亮==">Source: **Bold** · *Italic* · ~~Strike~~ · ==Highlight==</div><span class="cursor"></span></article>
+          <iframe id="colamd-try" src="./try/?embed=1" title="ColaMD 主题体验，可以直接在这里打字"></iframe>
         </div>
       </div>
     </div>
@@ -303,6 +286,7 @@
     const textNodes = document.querySelectorAll('[data-en]');
     const htmlNodes = document.querySelectorAll('[data-en-html]');
     const images = document.querySelectorAll('[data-en-alt]');
+    const tryFrame = document.getElementById('colamd-try');
     const preferred = localStorage.getItem('colamd-language') || (navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en');
 
     function setLanguage(language) {
@@ -316,6 +300,12 @@
       textNodes.forEach((node) => { node.textContent = node.dataset[isChinese ? 'zh' : 'en']; });
       htmlNodes.forEach((node) => { node.innerHTML = node.dataset[isChinese ? 'zhHtml' : 'enHtml']; });
       images.forEach((image) => { image.alt = image.dataset[isChinese ? 'zhAlt' : 'enAlt']; });
+      if (tryFrame) {
+        tryFrame.title = isChinese ? 'ColaMD 主题体验，可以直接在这里打字' : 'ColaMD themes, type right here';
+        if (tryFrame.contentWindow) {
+          tryFrame.contentWindow.postMessage({ type: 'colamd-try:set-lang', lang: isChinese ? 'zh' : 'en' }, location.origin);
+        }
+      }
       toggle.textContent = isChinese ? 'English' : '中文';
       localStorage.setItem('colamd-language', language);
     }
@@ -370,6 +360,36 @@
       // handler rewrites the paragraphs that hold these links, and listener
       // order decides which of the two runs first.
       if (toggle) toggle.addEventListener('click', function () { apply(); setTimeout(apply, 50); });
+    })();
+  </script>
+  <script>
+    // 首页把体验页放在 iframe 里。这一小段只管一件事：体验页说要全屏，就把这个
+    // 窗口铺满视口并锁住页面滚动；它说要退出，就把窗口还原。不换页面、不重载，
+    // 用户刚写的字都还在。
+    (() => {
+      const frame = document.getElementById('colamd-try');
+      const root = document.documentElement;
+
+      function setFullscreen(next) {
+        root.classList.toggle('try-fullscreen', next);
+        if (frame && frame.contentWindow) {
+          frame.contentWindow.postMessage({ type: 'colamd-try:set-fullscreen', full: next }, location.origin);
+        }
+      }
+
+      window.addEventListener('message', (event) => {
+        if (event.origin !== location.origin) return;
+        const data = event.data || {};
+        if (data.type === 'colamd-try:ask-fullscreen') setFullscreen(Boolean(data.full));
+        else if (data.type === 'colamd-try:ready' && frame && frame.contentWindow) {
+          const language = root.lang === 'zh-CN' ? 'zh' : 'en';
+          frame.contentWindow.postMessage({ type: 'colamd-try:set-lang', lang: language }, location.origin);
+        }
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && root.classList.contains('try-fullscreen')) setFullscreen(false);
+      });
     })();
   </script>
 </body>
