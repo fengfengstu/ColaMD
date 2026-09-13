@@ -183,14 +183,13 @@ body {
 }
 
 /* The active tab wears the paper colour with no bottom edge, so it opens into the
-   document. Square corners and no shadow. Its only accent is a 1px line in the
-   theme colour along the top edge: enough to carry the product colour, thin enough
-   not to dominate the filename. */
+   document. Square corners and no shadow, and no accent line either: the paper set
+   against the chrome is the active state, and a 1px theme line on top of it made the
+   strip shout for attention. */
 .tab-entry.active {
   background: var(--bg-color);
   border-color: color-mix(in srgb, var(--text-color) 16%, transparent);
   color: var(--text-color);
-  box-shadow: inset 0 1px 0 var(--link-color);
 }
 
 .tab-entry-name {
