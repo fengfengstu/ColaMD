@@ -150,7 +150,10 @@ ColaMD 是轻量 Markdown 编辑器，不追求功能堆叠。每增加一个按
 - hover 说明不能遮挡主要内容，也不能阻止鼠标操作。
 - disabled 控件必须降低透明度并停止 hover 强调。
 - **标题栏是窗口拖拽区（`-webkit-app-region: drag`），其中的元素不会派发鼠标事件**：点击、mouseenter、hover 都不会触发。控件必须自己标 `-webkit-app-region: no-drag` 才能被点击。
-- **标题栏内可以依赖 hover 显隐控件，但触发点必须自身可接收指针事件**：把 hover 触发点放在文件名（`no-drag` + `pointer-events: auto`）上，标题栏内的 hover 显隐是可靠的，`#titlebar:hover` 也会随之命中。v2.0.5 的「打开所在文件夹」按钮一度被认为 hover 失效，实际原因是提交 8dc5097 重构 `main.ts` 时删掉了该按钮的全部渲染层接线（元素引用、状态、`updateFileRevealButton()` 与点击绑定），按钮停在 `disabled`，而显隐规则是 `#titlebar:hover #reveal-file-btn:not(:disabled)`，禁用态永远不满足，因此永远不可见。接线恢复后 hover 与点击均正常。
+- **标题栏内可以依赖 hover 显隐控件，但触发点必须自身可接收指针事件**：把 hover 触发点放在文件名（`no-drag` + `pointer-events: auto`）上，标题栏内的 hover 显隐是可靠的。`pointer-events` 会继承，「打开所在文件夹」按钮曾经因为父容器 `#title-center` 是 `pointer-events: none` 而跟着继承 `none`：悬停文件名时能看到它，指针一移上去它就消失且再也碰不到，表现为「hover 被改丢了」。控件必须自己声明 `pointer-events: auto`（仅 `disabled` 时用 `none`）。
+- **hover 显隐控件的触发范围要覆盖整条移动路径**：触发点（文件名）与控件之间有空隙时，指针穿过空隙会让控件闪一下。用控件的 `::before` 铺一块不可见命中区跨过空隙；同时触发范围不得扩到无关控件（右上角那几个按钮 hover 时不许把「打开所在文件夹」带出来）。
+- **盖住文字的按钮不得半透明**：叉号、关闭按钮这类「浮在文字上的控件」，出现时必须 100% 不透明，否则文字会从按钮里透出来。用元素级 `opacity` 做「弱化」会让背景一起变半透明（曾用 `opacity: 0.75`，背景也只剩 75%），要弱化就弱化字形颜色（`color`），不要动 `opacity`。
+- **遮罩色必须等于它底下的表面色**：上条控件的背景要跟它所在表面完全同色（活动标签用 `--bg-color`，其余用 `--chrome-bg-hover`），并且要等这层表面淡入结束再出现（`transition: opacity 0s 0.15s`），否则不透明遮罩会盖在半透明表面上成为一个色块。
 - **禁用态不要当作显隐门**：需要 hover 才出现的控件，不要再把它同时设成 `disabled` 又用 `:not(:disabled)` 显隐，否则一处遗漏就会表现为「hover 失灵」，排查成本高。
 - **悬浮提示不得淡入**：提示本身不加 `opacity` 过渡，要么完全不透明要么不存在。透明度过渡会被拍到半透明，看上去像文字穿透提示框。
 - **标题栏内的浮层必须绘制在正文之上**：`#titlebar` 需要显式 `z-index`（当前 `30`）。`#title-center` 带 `transform`，自身形成层叠上下文，其子元素的 `z-index` 越不出这个上下文，曾导致「在 Finder 中显示」提示被正文文字压住。

@@ -200,8 +200,10 @@ body {
 }
 
 /* The close button floats over the tab: no width, no padding, nothing reserved
-   at rest, so a resting tab hugs its filename exactly. It masks what is behind
-   it with the tab's own surface colour, so a truncated name stays readable. */
+   at rest, so a resting tab hugs its filename exactly. When it shows it masks the
+   text behind it with a fully opaque surface colour, and it is never translucent:
+   a faded button lets the tab name read straight through it. Quietness comes from
+   the muted glyph colour, not from an opacity on the button. */
 .tab-entry-close {
   position: absolute;
   top: 50%;
@@ -213,32 +215,39 @@ body {
   padding: 0;
   border: none;
   border-radius: 4px;
-  background: transparent;
+  background: var(--chrome-bg-hover);
   color: inherit;
   opacity: 0;
+  pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: default;
-  transition: opacity 0.12s, background 0.12s;
+  transition: opacity 0s, background 0.12s, color 0.12s;
 }
 
 .tab-entry.active .tab-entry-close {
   background: var(--bg-color);
 }
 
-.tab-entry:not(.active) .tab-entry-close {
-  background: var(--chrome-bg-hover);
-}
-
 .tab-entry:hover .tab-entry-close,
 .tab-entry.active .tab-entry-close:focus-visible {
-  opacity: 0.75;
+  opacity: 1;
+  pointer-events: auto;
+  /* A resting tab's surface fades in over 0.15s: wait for it, so the opaque mask
+     never lands on a half-transparent tab. */
+  transition: opacity 0s 0.15s, background 0.12s, color 0.12s;
+}
+
+/* The active tab's surface never changes, so its close button appears at once. */
+.tab-entry.active:hover .tab-entry-close,
+.tab-entry.active .tab-entry-close:focus-visible {
+  transition: opacity 0s, background 0.12s, color 0.12s;
 }
 
 .tab-entry-close:hover {
-  opacity: 1;
   background: color-mix(in srgb, var(--text-color) 14%, var(--chrome-bg-hover));
+  color: var(--text-color);
 }
 
 .tab-entry.active .tab-entry-close:hover {
@@ -311,9 +320,19 @@ body {
   align-items: center;
   justify-content: center;
   -webkit-app-region: no-drag;
+  /* Opaque surface, and hit-testable even while hidden: the button is only ever
+     clicked when the pointer is on it, and being on it is what shows it. */
+  pointer-events: auto;
   opacity: 0;
-  pointer-events: none;
   transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+/* A wide, invisible hit area bridging the gap to the title, so the pointer
+   travelling from the filename to the icon does not make it blink. */
+#reveal-file-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 -10px;
 }
 
 #reveal-file-btn:disabled {
@@ -327,10 +346,12 @@ body {
   color: var(--text-muted);
 }
 
-/* Reveal on hovering the title itself (or the button), never when the pointer is
+/* Reveal on hovering the title itself or the button, never when the pointer is
    over the right-hand actions: those are unrelated controls and the extra icon
-   appearing out there is noise (design.md). */
-#title-center:hover #reveal-file-btn:not(:disabled),
+   appearing out there is noise (design.md). The button stays hit-testable while
+   hidden, otherwise it could never be reached or clicked. */
+#file-title:hover ~ #reveal-file-btn:not(:disabled),
+#reveal-file-btn:hover:not(:disabled),
 #reveal-file-btn:focus-visible {
   opacity: 1;
   pointer-events: auto;
