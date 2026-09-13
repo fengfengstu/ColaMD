@@ -94,8 +94,10 @@ body {
   opacity: 0.55;
 }
 
-/* Tabs are created from the File menu / ⌘T, or from the file list's right-click
-   menu (「在新标签页打开」). No permanent plus button: see design.md for why. */
+/* Tabs are created from the File menu / ⌘T, from the file list (⌘-click or the
+   right-click menu), and from the plus at the end of the strip, which appears
+   together with the strip. There is deliberately no plus in the title bar: it
+   would disappear the moment the strip shows up. */
 #tab-bar {
   height: var(--tab-bar-height, 0px);
   flex: none;
@@ -118,6 +120,31 @@ body {
 
 #tab-bar::-webkit-scrollbar {
   display: none;
+}
+
+/* The plus sits at the end of the strip, right after the last tab. */
+.tab-new-btn {
+  flex: none;
+  align-self: flex-end;
+  margin: 0 0 3px 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  -webkit-app-region: no-drag;
+  transition: background 0.12s, color 0.12s;
+}
+
+.tab-new-btn:hover {
+  background: var(--chrome-bg-hover);
+  color: var(--text-color);
 }
 
 .tab-entry {
