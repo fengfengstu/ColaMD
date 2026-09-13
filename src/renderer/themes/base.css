@@ -119,14 +119,6 @@ body {
 
 /* Tabs are created by the user (the + button or ⌘T). With one document there is
    no bar and --tab-bar-height is 0, so the layout matches the pre-tab app. */
-/* One chrome surface for the title bar and the tab strip (X does the same): from
-   the top of the window down to the baseline it is a single block, the tabs are
-   plain labels on it, and the active one is marked by a hairline of accent colour
-   resting on the baseline. No chips, no borders, no shadow. */
-body.has-tabs #titlebar {
-  background: var(--chrome-bg);
-}
-
 #tab-bar {
   height: var(--tab-bar-height, 0px);
   flex: none;
@@ -138,8 +130,8 @@ body.has-tabs #titlebar {
   overflow-y: hidden;
   scrollbar-width: none;
   background: var(--chrome-bg, transparent);
-  /* A hairline along the baseline separates chrome from document; the active tab's
-     accent line rests on top of it. */
+  /* The strip's baseline runs under the whole bar, and the active tab (opaque
+     paper, flush with the bottom) cuts it out, so it opens into the document. */
   box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--text-color) 11%, transparent);
 }
 
@@ -164,7 +156,8 @@ body.has-tabs #titlebar {
   height: 30px;
   /* Symmetric, so the filename sits centred in a tab that hugs it. */
   padding: 0 10px;
-  border: none;
+  border: 1px solid transparent;
+  border-bottom: none;
   background: transparent;
   color: var(--text-muted);
   font-family: inherit;
@@ -182,22 +175,15 @@ body.has-tabs #titlebar {
   color: var(--text-secondary, var(--text-color));
 }
 
-/* The active tab is marked the way X marks a tab: the label at full strength plus
-   a thin accent line on the strip's baseline. The tab itself stays plain, so the
-   strip reads as one block. */
+/* The active tab wears the paper colour with no bottom edge, so it opens into the
+   document. Square corners and no shadow. Its only accent is a 1px line in the
+   theme colour along the top edge: enough to carry the product colour, thin enough
+   not to dominate the filename. */
 .tab-entry.active {
+  background: var(--bg-color);
+  border-color: color-mix(in srgb, var(--text-color) 16%, transparent);
   color: var(--text-color);
-}
-
-.tab-entry.active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  border-radius: 1px;
-  background: var(--link-color);
+  box-shadow: inset 0 1px 0 var(--link-color);
 }
 
 .tab-entry-name {
@@ -244,18 +230,32 @@ body.has-tabs #titlebar {
   transition: opacity 0s, background 0.12s, color 0.12s;
 }
 
+.tab-entry.active .tab-entry-close {
+  background: var(--bg-color);
+}
+
 .tab-entry:hover .tab-entry-close,
 .tab-entry-close:focus-visible {
   opacity: 1;
   pointer-events: auto;
-  /* A tab's hover surface fades in over 0.15s: wait for it, so the opaque mask
+  /* A resting tab's surface fades in over 0.15s: wait for it, so the opaque mask
      never lands on a half-transparent tab. */
   transition: opacity 0s 0.15s, background 0.12s, color 0.12s;
+}
+
+/* The active tab's paper surface never fades, so its close button pops at once. */
+.tab-entry.active:hover .tab-entry-close,
+.tab-entry.active .tab-entry-close:focus-visible {
+  transition: opacity 0s, background 0.12s, color 0.12s;
 }
 
 .tab-entry-close:hover {
   background: color-mix(in srgb, var(--text-color) 14%, var(--chrome-bg-hover));
   color: var(--text-color);
+}
+
+.tab-entry.active .tab-entry-close:hover {
+  background: color-mix(in srgb, var(--text-color) 12%, var(--bg-color));
 }
 
 /* The strip clips its own overflow, so the shortcut hint lives in a fixed layer
