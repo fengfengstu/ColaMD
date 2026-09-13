@@ -149,7 +149,9 @@ body {
   align-items: center;
   gap: 6px;
   flex: 0 1 auto;
-  min-width: 84px;
+  /* A tab hugs its filename. The floor is one square (the tab is 30px tall), so
+     a tab with no text at all is still a proper target instead of a sliver. */
+  min-width: 30px;
   max-width: 190px;
   height: 30px;
   padding: 0 8px 0 12px;
