@@ -154,7 +154,9 @@ body {
   min-width: 30px;
   max-width: 190px;
   height: 30px;
-  padding: 0 8px 0 12px;
+  /* Symmetric, so the filename sits centred in a tab that hugs it. 30px total,
+     the same as before, so the tab width does not change. */
+  padding: 0 10px;
   border: 1px solid transparent;
   border-bottom: none;
   border-radius: 9px 9px 0 0;
