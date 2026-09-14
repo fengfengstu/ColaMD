@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell, session, clipboard } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, session, clipboard, screen } from 'electron'
 import { execFile } from 'child_process'
 import { autoUpdater } from 'electron-updater'
 import { join, basename, dirname, extname, isAbsolute, resolve, relative } from 'path'
@@ -85,6 +85,63 @@ function ensureThemesDir(): void {
 const recentStorePath = join(app.getPath('home'), '.colamd', 'recent.json')
 let recentStore: { recent: string[]; restoreOnLaunch: boolean } = { recent: [], restoreOnLaunch: true }
 const languagePreferencePath = join(app.getPath('userData'), 'language.json')
+
+// Window size, position and view zoom survive a restart. Having to resize and
+// re-zoom on every launch is a daily annoyance on a large display (#95), and
+// these are the same kind of choice the app already remembers for themes, panel
+// width and language.
+const windowStatePath = join(app.getPath('userData'), 'window-state.json')
+interface SavedWindowState {
+  bounds?: { x: number; y: number; width: number; height: number }
+  zoom?: number
+}
+
+function loadWindowState(): SavedWindowState {
+  try {
+    const parsed = JSON.parse(readFileSync(windowStatePath, 'utf-8')) as SavedWindowState
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+let savedWindowState: SavedWindowState = loadWindowState()
+
+// A saved position can point at a display that is no longer attached, which
+// would put the window somewhere the user cannot reach. Keep it only when it
+// still overlaps a screen that exists right now.
+function usableBounds(): { x: number; y: number; width: number; height: number } | undefined {
+  const bounds = savedWindowState.bounds
+  if (!bounds) return undefined
+  const values = [bounds.x, bounds.y, bounds.width, bounds.height]
+  if (!values.every((value) => typeof value === 'number' && Number.isFinite(value))) return undefined
+  if (bounds.width < 600 || bounds.height < 400) return undefined
+  const onScreen = screen.getAllDisplays().some((display) => {
+    const area = display.workArea
+    return bounds.x < area.x + area.width && bounds.x + bounds.width > area.x
+      && bounds.y < area.y + area.height && bounds.y + bounds.height > area.y
+  })
+  return onScreen ? bounds : undefined
+}
+
+let windowStateSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+function saveWindowState(win: BrowserWindow): void {
+  if (win.isDestroyed()) return
+  // getNormalBounds keeps a full-screen or maximised window from being stored
+  // as the size of the screen.
+  const bounds = win.getNormalBounds()
+  const zoom = win.webContents.getZoomFactor()
+  savedWindowState = { bounds, zoom }
+  void mkdir(dirname(windowStatePath), { recursive: true })
+    .then(() => writeFile(windowStatePath, JSON.stringify({ bounds, zoom }), 'utf-8'))
+    .catch(() => { /* a preference that cannot be written is not worth a dialog */ })
+}
+
+function scheduleWindowStateSave(win: BrowserWindow): void {
+  if (windowStateSaveTimer) clearTimeout(windowStateSaveTimer)
+  windowStateSaveTimer = setTimeout(() => saveWindowState(win), 600)
+}
 type UiLanguage = 'zh' | 'en'
 let preferredLanguage: UiLanguage | null = null
 try {
@@ -262,8 +319,7 @@ function notifyExternalChange(win: BrowserWindow, filePath: string): void {
 
 function createWindow(filePath?: string, initialContent?: string, initialBrowsePath?: string): BrowserWindow {
   const win = new BrowserWindow({
-    width: 960,
-    height: 720,
+    ...(usableBounds() ?? { width: 960, height: 720 }),
     minWidth: 600,
     minHeight: 400,
     titleBarStyle: 'hiddenInset',
@@ -290,6 +346,10 @@ function createWindow(filePath?: string, initialContent?: string, initialBrowseP
 
   win.webContents.on('did-finish-load', () => {
     markStartup('renderer-loaded')
+    // The zoom level lives on the webContents, so a new window has to be told.
+    if (typeof savedWindowState.zoom === 'number' && savedWindowState.zoom > 0) {
+      win.webContents.setZoomFactor(savedWindowState.zoom)
+    }
     const deliver = (): void => {
       if (filePath) {
         // The queued tab-opens must go out only after this document's
@@ -327,6 +387,12 @@ function createWindow(filePath?: string, initialContent?: string, initialBrowseP
       }, 10_000)
     }
   })
+
+  // Remember the window's own geometry, so the next launch opens where this one
+  // was left instead of at the default size (#95).
+  win.on('resize', () => scheduleWindowStateSave(win))
+  win.on('move', () => scheduleWindowStateSave(win))
+  win.on('close', () => saveWindowState(win))
 
   // Intercept window close: confirm unsaved changes before the window dies.
   // cmd+w (role: 'close') and quit both funnel through here.

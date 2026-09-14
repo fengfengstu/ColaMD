@@ -46,6 +46,24 @@ The two items below are the ones actually blocking us. Everything else on this p
 
 These features are implemented on `main` and await release verification.
 
+### Footnote hover preview
+
+**Source:** [#25](https://github.com/marswaveai/ColaMD/issues/25)
+
+**Status:** hovering a footnote reference shows its definition in a floating card, read from the document itself. The card is part of the hover zone so a long definition can be scrolled, moving the pointer across the gap does not dismiss it, and multi-block definitions keep their paragraphs apart.
+
+### Markdown formatting shortcuts
+
+**Source:** [#58](https://github.com/marswaveai/ColaMD/issues/58)
+
+**Status:** the Edit menu carries a Format submenu with bold, italic, inline code, strikethrough, link (URL from the clipboard), bullet list and ordered list, so the shortcuts are discoverable from the menu rather than only from documentation. Commands apply only while the editor has focus. Customising or disabling them stays a candidate below.
+
+### Remember window size and view zoom
+
+**Source:** [#95](https://github.com/marswaveai/ColaMD/issues/95)
+
+**Status:** the window's position, size and view zoom are stored next to the other preferences and restored on the next launch. A stored position that no longer overlaps any attached display falls back to the default size, so unplugging a monitor cannot strand the window off screen.
+
 ### Themes as standalone files, with a guide for writing your own
 
 **Source:** [#91](https://github.com/marswaveai/ColaMD/issues/91)
@@ -189,12 +207,6 @@ Rule kept: exactly nine cards. The order is documented in an HTML comment above 
 
 ## Candidates
 
-### Remember window size and view zoom
-
-**Source:** [#95](https://github.com/marswaveai/ColaMD/issues/95)
-
-Theme, panel width and visibility, and language persist; window bounds and view zoom do not, so a 2K display has to be re-adjusted every launch. Store both alongside the existing preferences. Keep the two values independent so zoom does not get folded into the bounds, and only restore a window size the user actually changed.
-
 ### One row title bar with tabs
 
 **Source:** [#90](https://github.com/marswaveai/ColaMD/issues/90)
@@ -238,17 +250,7 @@ Both lose what the installer provides: `.md` file association, a Start Menu entr
 **Sources:** [#63](https://github.com/marswaveai/ColaMD/issues/63)
 
 Bug report: opening the first .md is fast, but opening another file while one is already open stalls for a long time. Profile the second-open path (window reuse, watcher re-establish, editor re-init) before optimizing; measure first per the Windows startup performance precedent.
-### Code block syntax highlighting
 
-**Sources:** [#54](https://github.com/marswaveai/ColaMD/issues/54)
-
-**Need:** fenced code blocks currently render as plain monospace. Highlight common languages with a lightweight highlighter that stays out of the startup bundle — loaded lazily the way Mermaid is, so opening a document with no code still costs nothing.
-
-### Markdown style shortcuts
-
-**Sources:** [#58](https://github.com/marswaveai/ColaMD/issues/58)
-
-**Need:** keyboard shortcuts for common inline Markdown (bold, italic, link, headings) inside the editor. Scope must stay small: only mappings the editor can apply and reverse through its own serializer, no parallel formatting engine.
 
 ### Merge documents from different directories into one tab group
 
@@ -256,17 +258,7 @@ Bug report: opening the first .md is fast, but opening another file while one is
 
 **Status:** partially addressed on `main` (#99): files arriving from the OS (double-click, second launch) now open as tabs of the existing window, and ⌘O / recent files open as tabs too. What remains is the in-app path: the file panel still browses only the active document's directory, so collecting documents from several folders into one window needs a panel-level decision (recents view, pinned folders, or a full picker). Not scheduled.
 
-### Windows menu bar merged into the title bar
 
-**Sources:** [#46](https://github.com/marswaveai/ColaMD/issues/46)
-
-**Need:** on Windows the menu bar occupies its own row under the title bar. Merging it (hidden menu, ⌥/Alt to reveal, or a custom title bar) must not break window dragging, the maximized-state hit targets, or the tab strip that sits right under it. Needs a Windows machine to evaluate properly.
-
-### Remember window size and panel state
-
-**Sources:** [#95](https://github.com/marswaveai/ColaMD/issues/95)
-
-**Need:** persist the last window size/position and restore it at launch, alongside the panel width that already persists. Small scope; not scheduled yet.
 
 ### Plugin ecosystem
 
@@ -291,15 +283,6 @@ Interop is cheap because Knap is an AST interpreter with no `eval` and ships a C
 
 The maintainer also raised the mirror idea on 2026-09-11: ColaMD itself could ship as a plugin for another host, so the product is both a host for templates and guests in other ecosystems. Tracked here as direction only, with no scope decided.
 
-### Markdown formatting shortcuts
-
-**Source:** [#58](https://github.com/marswaveai/ColaMD/issues/58)
-
-**Need:** Provide discoverable shortcuts for common Markdown formatting such as bold, italic, links, lists, strikethrough, and inline code.
-
-**Scope:** First evaluate the common commands and conflicts with editor/browser shortcuts. Keep shortcut customization and disable controls out of the initial implementation; they require a broader preferences/keybinding system.
-
-**Status:** Candidate. Implemented on the `feat/format-shortcuts` branch as a Format submenu in the Edit menu, within the scope above (no customization, no toolbar).
 
 ### Shortcut customization (keybinding preferences)
 
@@ -349,21 +332,14 @@ The maintainer also raised the mirror idea on 2026-09-11: ColaMD itself could sh
 
 No decision yet on which AI capabilities belong in the editor, and therefore no commitment. The earlier notes on built-in translation still describe the cost of getting this wrong (provider, configuration, privacy, product scope). Any concrete proposal should start from a narrow, zero-configuration shape that does not add persistent UI, and be reviewed against the same principles as everything else.
 
+**Need:** fenced code blocks currently render as plain monospace. Highlight common languages with a lightweight highlighter that stays out of the startup bundle, loaded lazily the way Mermaid is, so a document with no code still costs nothing.
+
 ### Code block syntax highlighting
 
 **Sources:** [#54](https://github.com/marswaveai/ColaMD/issues/54)
 
 Fenced code blocks currently render as plain styled text with a copy button, without language-aware colouring. Adding it means shipping a highlighter and deciding which languages to support, so it stays tracked rather than committed. The issue remains open.
 
-### Footnote hover preview
-
-**Source:** [#25](https://github.com/marswaveai/ColaMD/issues/25)
-
-**Need:** Hover a footnote reference to preview its definition in place, instead of jumping to the document bottom.
-
-**Why it fits:** Standard GFM footnotes (`[^1]` / `[^1]:`) are already parsed. A hover preview improves navigation without adding new UI.
-
-**Constraints:** Build on the existing footnote rendering with a lightweight hover interaction. Do not add a permanent panel.
 
 ## Declined
 
