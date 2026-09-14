@@ -2,6 +2,39 @@
 
 This is the holding list for requests that have a clear user need but are not committed roadmap work. Entries stay here until they are accepted into a release plan or explicitly declined.
 
+**How to read the labels**
+
+- `Help wanted` — we cannot finish it alone: it needs hardware, an environment, or a reproduction we do not have. Please comment on the linked issue; Chinese or English both fine.
+- `In progress` — someone is building it right now. Comment on the issue instead of starting a second implementation.
+- `Candidate` — free to pick up. Say so on the issue first so two people do not meet in the same file.
+- `Declined` — not planned, with the reason recorded.
+
+## Help wanted / 急需帮助
+
+The two items below are the ones actually blocking us. Everything else on this page is either being built by the maintainer or is simply not scheduled yet — these are the ones where an outside hand changes the outcome.
+
+### Windows input stutter while typing
+
+**Sources:** [#78](https://github.com/marswaveai/ColaMD/issues/78)
+
+**Reported:** Windows 11, NVIDIA GPU, AMD CPU. Typing stalls roughly every six characters.
+
+**Needed:** reproduction and profiling on Windows: does the stall follow IME composition, autosave, Mermaid rendering, or the renderer's paint loop? Is it the editor, the file watcher, or the GPU process?
+
+**Why it is stuck:** the maintainer only has macOS hardware. Startup time is already instrumented (`COLAMD_STARTUP_TRACE=1`), so a Windows user can produce a comparable trace; nobody has been able to run it on a machine that shows the stall.
+
+**How to help:** comment on [#78](https://github.com/marswaveai/ColaMD/issues/78) with your GPU and driver version, input method, document size, and whether the stutter changes when the document contains no Mermaid block or when autosave is off.
+
+### Image export failures
+
+**Sources:** [#88](https://github.com/marswaveai/ColaMD/issues/88)
+
+**Reported:** export to image fails for some users, on both desktop and mobile export modes.
+
+**Needed:** a document that reproduces it. Export shares one rendering path across the export options, so a failing file usually points straight at the cause.
+
+**How to help:** comment on [#88](https://github.com/marswaveai/ColaMD/issues/88) with the failing document (or a cut-down version), the platform, the export option used, and whether the current release still fails.
+
 ## Implemented On Main
 
 These features are implemented on `main` and await release verification.
@@ -100,6 +133,8 @@ The reveal button shipped in v2.0.4 and v2.0.5 was unreachable, but not because 
 
 **Status:** Shipped in `v2.1.0`. Keep several documents open in one window instead of replacing the current document. Each tab holds its own content, unsaved state, undo history and scroll position.
 
+**In progress (maintainer).** The tab strip itself is actively being refined — chrome height, the hover `⌘W` affordance, tab widths and the title-bar relationship are all still moving ([#90](https://github.com/marswaveai/ColaMD/issues/90)). Do not start a parallel tab implementation; comment on the issue or open a PR against the maintainer's current work instead.
+
 Re-opened as a candidate on 2026-09-11 instead of staying declined, then designed and built during 2026-09-13. The spec lives in `design.md` (section on tabs): user-created tabs only, no strip until there are two tabs, no persistence, no drag between windows. Creation entries are `⌘T`, File → New Tab, and the file panel's right-click Open in New Tab; there is deliberately no plus button in the chrome.
 
 ## Security Maintenance
@@ -161,16 +196,6 @@ Both lose what the installer provides: `.md` file association, a Start Menu entr
 **Sources:** [#63](https://github.com/marswaveai/ColaMD/issues/63)
 
 Bug report: opening the first .md is fast, but opening another file while one is already open stalls for a long time. Profile the second-open path (window reuse, watcher re-establish, editor re-init) before optimizing; measure first per the Windows startup performance precedent.
-### Temporary same-directory document switcher
-
-**Source:** User feedback and the temporary design prototype ([`temporary-document-switcher-prototype.html`](temporary-document-switcher-prototype.html), 2026-09-01)
-
-**Need:** Reduce repeated new-window creation when moving among a few Markdown files in the same directory, especially on Windows, without introducing a workspace model.
-
-**Scope:** A quiet switcher below the title bar, shown only with two or more documents. Start with up to three same-directory documents; preserve each document's content, dirty state, scroll position, and source/visual mode while switching. Do not support cross-directory tabs, drag sorting, pinned tabs, persistence, or startup session restoration. Current-item distinction should rely on subtle light/dark surfaces，not an accent-color underline. Refine the left-side visual spacing before implementation.
-
-**Status:** Candidate. Prototype accepted as direction; not scheduled.
-
 ### Plugin ecosystem
 
 **Raised:** 2026-09-11, by the maintainer.
@@ -288,3 +313,7 @@ The status dot driven by file-watcher timing was removed on 2026-09-11. It could
 **Source:** [#67](https://github.com/marswaveai/ColaMD/pull/67)
 
 Two- and three-page reading layouts for ultrawide displays were declined. ColaMD is an editor, not a paginated reader; the feature costs ~480 lines of pagination logic, hijacks wheel/trackpad/page keys, and sits on the known-fragile CSS multicol + contenteditable ground (IME, cross-column selection, position loss after external reload) for a single edge-case scenario.
+
+### Temporary same-directory document switcher
+
+**Superseded — do not build.** This was the 2026-09-01 direction for the same need as tabs ([#59](https://github.com/marswaveai/ColaMD/issues/59)): a quiet strip below the title bar holding up to three same-directory documents. The tab strip shipped in `v2.1.0` covers that need with an explicit model instead (open a tab when you want one, the file panel keeps replacing the current document), so the switcher is closed and the prototype in `temporary-document-switcher-prototype.html` is history rather than a plan.
