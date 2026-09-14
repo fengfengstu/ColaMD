@@ -8,6 +8,7 @@ import { history } from '@milkdown/kit/plugin/history'
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
 import { clipboard } from '@milkdown/kit/plugin/clipboard'
 import { replaceAll, $prose } from '@milkdown/kit/utils'
+import { wrapInList, liftListItem } from '@milkdown/kit/prose/schema-list'
 import { remarkMathPlugin, katexOptionsCtx, mathInlineSchema, mathBlockSchema } from '@milkdown/plugin-math'
 import { htmlView } from './html-view'
 import { mermaidView } from './mermaid-view'
@@ -405,18 +406,73 @@ function setupCodeBlockCopy(root: HTMLElement): void {
   resizeObserver.observe(root)
 }
 
-function toggleStrongMark(): void {
+// --- Format commands (#58): one pipeline for every format shortcut ---
+// Marks toggle on the selection; lists wrap the current block. Empty
+// selections are a no-op for marks, matching the previous cmd+B behavior.
+
+export type FormatCommandId = 'bold' | 'italic' | 'inlineCode' | 'strikethrough' | 'link' | 'bulletList' | 'orderedList'
+
+export function runFormatCommand(id: FormatCommandId): void {
   if (!editorInstance) return
   editorInstance.action((ctx) => {
     const view = ctx.get(editorViewCtx)
+    // Menu accelerators are window-global. Without focus in the editor they
+    // would write marks into the hidden ProseMirror document (source mode
+    // textarea, search panel, file panel); gate them like the old keydown
+    // handler, which only lived on the editor root.
+    if (!view.hasFocus()) return
     const { from, to, empty } = view.state.selection
-    if (empty) return
-    const strong = view.state.schema.marks.strong
-    if (!strong) return
-    const transaction = view.state.doc.rangeHasMark(from, to, strong)
-      ? view.state.tr.removeMark(from, to, strong)
-      : view.state.tr.addMark(from, to, strong.create())
-    view.dispatch(transaction)
+    if (id === 'bulletList' || id === 'orderedList') {
+      const nodeType = view.state.schema.nodes[id === 'bulletList' ? 'bullet_list' : 'ordered_list']
+      const itemType = view.state.schema.nodes.list_item
+      if (!nodeType || !itemType) return
+      // Toggle: pressing the shortcut inside that list type lifts the block
+      // out instead of nesting another layer (review on #87).
+      let inside = false
+      for (let depth = view.state.selection.$from.depth; depth > 0; depth -= 1) {
+        if (view.state.selection.$from.node(depth).type === nodeType) {
+          inside = true
+          break
+        }
+      }
+      if (inside) liftListItem(itemType)(view.state, view.dispatch)
+      else wrapInList(nodeType)(view.state, view.dispatch)
+      return
+    }
+    if (id === 'link') {
+      const link = view.state.schema.marks.link
+      if (!link || empty) return
+      // Toggle like every other mark: ⌘K on a linked selection removes it
+      // instead of overwriting the href (review on #87).
+      if (view.state.doc.rangeHasMark(from, to, link)) {
+        view.dispatch(view.state.tr.removeMark(from, to, link))
+        return
+      }
+      // The URL comes from the main-process clipboard via IPC: menu
+      // accelerators carry no transient user activation, so a renderer-side
+      // clipboard read is not guaranteed to be allowed on every platform.
+      void window.electronAPI.readClipboardText().then((text) => {
+        const url = text.trim()
+        const liveView = getEditorView()
+        if (!liveView || !/^https?:\/\/\S+$/i.test(url)) return
+        const selection = liveView.state.selection
+        liveView.dispatch(liveView.state.tr.addMark(selection.from, selection.to, link.create({ href: url })))
+      })
+      return
+    }
+    const candidates = id === 'bold'
+      ? ['strong']
+      : id === 'italic'
+        ? ['em', 'emphasis']
+        : id === 'inlineCode'
+          ? ['inlineCode', 'code']
+          // Milkdown's gfm preset registers the mark as `strike_through`
+          // even though the export is named strikethroughSchema (review on #87).
+          : ['strike_through', 'strikethrough']
+    const mark = candidates.map((name) => view.state.schema.marks[name]).find(Boolean)
+    if (!mark || empty) return
+    const has = view.state.doc.rangeHasMark(from, to, mark)
+    view.dispatch(has ? view.state.tr.removeMark(from, to, mark) : view.state.tr.addMark(from, to, mark.create()))
   })
 }
 
@@ -496,14 +552,6 @@ export async function createEditor(
   // Enhance clipboard with inline styles for rich text paste (e.g. WeChat)
   root.addEventListener('copy', enhanceClipboard)
   root.addEventListener('cut', enhanceClipboard)
-
-  // Cmd/Ctrl+B toggles the strong mark for an existing selection. This keeps
-  // basic formatting editable without adding a permanent toolbar.
-  root.addEventListener('keydown', (e) => {
-    if (e.defaultPrevented || !(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 'b') return
-    e.preventDefault()
-    toggleStrongMark()
-  })
 
   // Intra-document anchor links are pure navigation: handle them in the
   // capture phase and keep ProseMirror out, so placing the caret (and its

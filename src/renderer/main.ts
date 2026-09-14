@@ -1,4 +1,4 @@
-import { createEditor, flashHeadingOnArrival, getMarkdown, onEditorJumpPhase, setMarkdown, showMathModal, setMathModalLanguage, releaseMermaidRenderer, getEditorState, restoreEditorState, applyMarkdownStyle } from './editor/editor'
+import { createEditor, flashHeadingOnArrival, getMarkdown, onEditorJumpPhase, setMarkdown, showMathModal, setMathModalLanguage, releaseMermaidRenderer, getEditorState, restoreEditorState, applyMarkdownStyle, runFormatCommand, type FormatCommandId } from './editor/editor'
 import { detectMarkdownStyle } from './editor/markdown-style'
 import { SearchPanel } from './editor/search-panel'
 import { applyTheme, loadSavedTheme } from './themes/theme-manager'
@@ -1311,6 +1311,7 @@ async function init(): Promise<void> {
   setMathModalLanguage(language)
   api.onSearch(() => searchPanel.show())
   api.onMathModal(() => showMathModal())
+  api.onFormatCommand((id) => runFormatCommand(id as FormatCommandId))
   updateUiLanguage()
 
   await createEditor('editor', (markdown) => {
