@@ -196,6 +196,36 @@ Both lose what the installer provides: `.md` file association, a Start Menu entr
 **Sources:** [#63](https://github.com/marswaveai/ColaMD/issues/63)
 
 Bug report: opening the first .md is fast, but opening another file while one is already open stalls for a long time. Profile the second-open path (window reuse, watcher re-establish, editor re-init) before optimizing; measure first per the Windows startup performance precedent.
+### Code block syntax highlighting
+
+**Sources:** [#54](https://github.com/marswaveai/ColaMD/issues/54)
+
+**Need:** fenced code blocks currently render as plain monospace. Highlight common languages with a lightweight highlighter that stays out of the startup bundle — loaded lazily the way Mermaid is, so opening a document with no code still costs nothing.
+
+### Markdown style shortcuts
+
+**Sources:** [#58](https://github.com/marswaveai/ColaMD/issues/58)
+
+**Need:** keyboard shortcuts for common inline Markdown (bold, italic, link, headings) inside the editor. Scope must stay small: only mappings the editor can apply and reverse through its own serializer, no parallel formatting engine.
+
+### Merge documents from different directories into one tab group
+
+**Sources:** [#59](https://github.com/marswaveai/ColaMD/issues/59)
+
+**Status:** partially addressed on `main` (#99): files arriving from the OS (double-click, second launch) now open as tabs of the existing window, and ⌘O / recent files open as tabs too. What remains is the in-app path: the file panel still browses only the active document's directory, so collecting documents from several folders into one window needs a panel-level decision (recents view, pinned folders, or a full picker). Not scheduled.
+
+### Windows menu bar merged into the title bar
+
+**Sources:** [#46](https://github.com/marswaveai/ColaMD/issues/46)
+
+**Need:** on Windows the menu bar occupies its own row under the title bar. Merging it (hidden menu, ⌥/Alt to reveal, or a custom title bar) must not break window dragging, the maximized-state hit targets, or the tab strip that sits right under it. Needs a Windows machine to evaluate properly.
+
+### Remember window size and panel state
+
+**Sources:** [#95](https://github.com/marswaveai/ColaMD/issues/95)
+
+**Need:** persist the last window size/position and restore it at launch, alongside the panel width that already persists. Small scope; not scheduled yet.
+
 ### Plugin ecosystem
 
 **Raised:** 2026-09-11, by the maintainer.
