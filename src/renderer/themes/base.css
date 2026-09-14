@@ -40,45 +40,16 @@ body {
   flex-shrink: 0;
   background: var(--chrome-bg, transparent);
   position: relative;
-  /* Tooltips inside the titlebar must paint above the editor. `#title-center`
-     carries a transform, so it forms its own stacking context and the tooltip's
-     z-index cannot escape it. */
+  /* Tooltips inside the titlebar must paint above the editor. */
   z-index: 30;
 }
 
-#title-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  /* The box is sized by the file name alone, so the title stays centred in the
-     window. The reveal button and the save status hang off its right edge. */
-  max-width: calc(100% - 400px);
-  display: flex;
-  align-items: center;
-  pointer-events: none;
-}
-
-#file-title {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  min-width: 0;
-  font-size: 13px;
-  line-height: 1.3;
-  color: var(--text-muted);
-  /* The titlebar is a window drag region and never receives pointer events, so
-     the reveal button hangs its hover on the title itself, which must stay
-     interactive to be hoverable. */
-  pointer-events: auto;
-  -webkit-app-region: no-drag;
-  cursor: default;
-}
-
 #save-status {
-  position: absolute;
-  left: calc(100% + 44px);
-  top: 50%;
+  /* Anchored to the right-hand button cluster: there is no centred filename to
+     hang off any more. */
+  position: fixed;
+  right: 108px;
+  top: 20px;
   transform: translateY(-50%);
   white-space: nowrap;
   font-size: 11px;
@@ -99,21 +70,35 @@ body {
    together with the strip. There is deliberately no plus in the title bar: it
    would disappear the moment the strip shows up. */
 #tab-bar {
-  height: var(--tab-bar-height, 0px);
+  /* One row of chrome: the strip lives inside the title bar's row, from the
+     traffic lights to the right-hand buttons. */
+  position: absolute;
+  top: 0;
+  left: 84px;
+  right: 150px;
+  height: 40px;
+  z-index: 31;
   flex: none;
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  /* Left keeps the first tab close to the window edge; the right keeps room
-     for the plus that trails the strip. */
-  padding: 0 14px 0 6px;
+  /* The panel is not part of the strip: the tabs start at its right edge, and
+     run from the window edge when the panel is hidden. */
+  padding: 0;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  background: var(--chrome-bg, transparent);
-  /* The strip's baseline runs under the whole bar, and the active tab (opaque
-     paper, flush with the bottom) cuts it out, so it opens into the document. */
-  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--text-color) 11%, transparent);
+  background: transparent;
+  -webkit-app-region: drag;
+}
+
+body.show-file-panel #tab-bar {
+  left: calc(var(--file-panel-width, 220px) + 6px);
+}
+
+.tab-entry,
+.tab-new-btn {
+  -webkit-app-region: no-drag;
 }
 
 #tab-bar[hidden] {
@@ -127,44 +112,6 @@ body {
 /* From two tabs up the strip shares the title bar's row: one row of chrome at
    the top of the window, and the filename gives way to it (the active tab already
    carries the name). The empty part of the strip still drags the window. */
-body.has-tabs #tab-bar {
-  position: absolute;
-  top: 0;
-  left: 84px;
-  right: 150px;
-  height: 40px;
-  z-index: 31;
-  padding: 0;
-  background: transparent;
-  -webkit-app-region: drag;
-}
-
-body.has-tabs .tab-entry,
-body.has-tabs .tab-new-btn {
-  -webkit-app-region: no-drag;
-}
-
-body.has-tabs #title-center {
-  /* No longer a centring box for a filename: it only anchors the save status. */
-  transform: none;
-  max-width: none;
-}
-
-body.has-tabs #file-title,
-body.has-tabs #reveal-file-btn {
-  display: none;
-}
-
-body.has-tabs #save-status {
-  /* The filename is gone from this layout, so the indicator is anchored to the
-     right-hand button cluster instead of the title. */
-  position: fixed;
-  left: auto;
-  right: 108px;
-  top: 20px;
-  transform: translateY(-50%);
-}
-
 /* The plus sits at the end of the strip, right after the last tab. */
 .tab-new-btn {
   flex: none;
@@ -355,59 +302,12 @@ body.has-tabs #save-status {
   background: rgba(127, 127, 127, 0.2);
 }
 
-#reveal-file-btn {
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-app-region: no-drag;
-  /* Opaque surface, and hit-testable even while hidden: the button is only ever
-     clicked when the pointer is on it, and being on it is what shows it. */
-  pointer-events: auto;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s, color 0.15s;
-}
-
 /* A wide, invisible hit area bridging the gap to the title, so the pointer
    travelling from the filename to the icon does not make it blink. */
-#reveal-file-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 0 -10px;
-}
-
-#reveal-file-btn:disabled {
-  opacity: 0;
-  pointer-events: none;
-  cursor: default;
-}
-
-#reveal-file-btn:disabled:hover {
-  background: transparent;
-  color: var(--text-muted);
-}
-
 /* Reveal on hovering the title itself or the button, never when the pointer is
    over the right-hand actions: those are unrelated controls and the extra icon
    appearing out there is noise (design.md). The button stays hit-testable while
    hidden, otherwise it could never be reached or clicked. */
-#file-title:hover ~ #reveal-file-btn:not(:disabled),
-#reveal-file-btn:hover:not(:disabled),
-#reveal-file-btn:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 /* Source (Markdown) / WYSIWYG toggle */
 #source-toggle-btn {
   position: absolute;
@@ -451,11 +351,6 @@ body.has-tabs #save-status {
 #word-count:hover,
 #source-toggle-btn:hover,
 #file-toggle-btn:hover,
-#reveal-file-btn:hover {
-  background: rgba(127, 127, 127, 0.14);
-  color: var(--text-color);
-}
-
 .toolbar-tip {
   position: absolute;
   top: calc(100% + 6px);
@@ -480,12 +375,6 @@ body.has-tabs #save-status {
 }
 
 #titlebar > button:hover .toolbar-tip,
-#reveal-file-btn:hover .toolbar-tip,
-#reveal-file-btn:focus-visible .toolbar-tip {
-  opacity: 1;
-  transform: translateY(0);
-}
-
 #word-count {
   cursor: default;
 }

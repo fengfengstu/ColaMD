@@ -17,9 +17,7 @@ const fileTabEl = () => document.getElementById('file-panel-files') as HTMLButto
 const outlineTabEl = () => document.getElementById('file-panel-outline') as HTMLButtonElement
 const fileToggleBtnEl = () => document.getElementById('file-toggle-btn') as HTMLButtonElement
 const sourceToggleBtnEl = () => document.getElementById('source-toggle-btn') as HTMLButtonElement
-const revealFileBtnEl = () => document.getElementById('reveal-file-btn') as HTMLButtonElement
 const wordCountEl = () => document.getElementById('word-count') as HTMLElement
-const fileTitleEl = () => document.getElementById('file-title') as HTMLElement
 const saveStatusEl = () => document.getElementById('save-status') as HTMLElement
 const updateBannerEl = () => document.getElementById('update-banner') as HTMLElement
 const updateBannerTextEl = () => document.getElementById('update-banner-text') as HTMLElement
@@ -182,8 +180,11 @@ function activeTab(): DocumentTab | null {
   return tabs.find((tab) => tab.id === activeTabId) ?? null
 }
 
+// The label for a document that has no path yet, in the current UI language.
+let untitledName = 'Untitled'
+
 function untitledLabel(): string {
-  return fileTitleEl().dataset.untitled || 'Untitled'
+  return untitledName
 }
 
 function tabLabel(tab: DocumentTab): string {
@@ -302,9 +303,10 @@ function plusGlyph(): SVGSVGElement {
 function renderTabBar(): void {
   captureActiveTab()
   const bar = tabBarEl()
-  const visible = tabs.length > 1
-  bar.hidden = !visible
-  document.body.classList.toggle('has-tabs', visible)
+  // The strip is always there: with the layout collapsed into the title bar's
+  // row it costs no extra height, and one shape for the chrome beats a title bar
+  // that changes personality when a second document appears.
+  bar.hidden = false
   // The strip lives inside the title bar's row now, so it consumes no height of
   // its own: the editor starts right under the same 40px row either way.
   document.documentElement.style.setProperty('--tab-bar-height', '0px')
@@ -315,7 +317,6 @@ function renderTabBar(): void {
   // for a tab that no longer exists, and a visible hint would never leave —
   // the strip it belongs to is gone, so no mouseleave can fire (#90).
   hideTabTip()
-  if (!visible) return
   for (const tab of tabs) {
     const entry = document.createElement('div')
     entry.className = 'tab-entry'
@@ -365,7 +366,6 @@ function showBlankDocument(): void {
   updateWordCount('')
   resetDirty()
   updateFileTitle()
-  updateFileRevealButton()
   updatePanelVisibility()
   void refreshSiblings()
   scheduleOutlineUpdate()
@@ -461,7 +461,6 @@ async function activateTab(id: string): Promise<void> {
     }
     updateWordCount()
     updateFileTitle()
-    updateFileRevealButton()
     updatePanelVisibility()
     void refreshSiblings()
     scheduleOutlineUpdate()
@@ -725,7 +724,6 @@ async function saveCurrent(saveAs = false): Promise<boolean> {
 
   currentFilePath = path
   updateFileTitle()
-  updateFileRevealButton()
   refreshSiblings()
   noteTabSaved(content)
   if (path !== expectedPath) renderTabBar()
@@ -787,17 +785,6 @@ function fileLocationLabel(): string {
 // The titlebar is a window drag region, so the button cannot rely on
 // `#titlebar:hover`. Its gate lives on the file title instead; this keeps the
 // label and the disabled state in sync with the loaded document.
-function updateFileRevealButton(): void {
-  const btn = revealFileBtnEl()
-  const label = fileLocationLabel()
-  btn.disabled = currentFilePath === null
-  // Only the styled .toolbar-tip is used; a native title tooltip would stack a
-  // second label on top of it. Sibling titlebar buttons rely on aria-label too.
-  btn.setAttribute('aria-label', label)
-  const tip = btn.querySelector('.toolbar-tip')
-  if (tip) tip.textContent = label
-}
-
 // --- Markdown source / WYSIWYG toggle ---
 function updateSourceToggle(): void {
   const btn = sourceToggleBtnEl()
@@ -814,13 +801,11 @@ function updateUiLanguage(): void {
   const zh = isChinese()
   document.documentElement.lang = zh ? 'zh-CN' : 'en'
   document.title = 'ColaMD'
-  fileTitleEl().dataset.untitled = zh ? '未命名' : 'Untitled'
-  if (!currentFilePath) fileTitleEl().textContent = fileTitleEl().dataset.untitled ?? 'Untitled'
+  untitledName = zh ? '未命名' : 'Untitled'
   fileTabEl().textContent = zh ? '文件' : 'Files'
   outlineTabEl().textContent = zh ? '大纲' : 'Outline'
   fileToggleBtnEl().setAttribute('aria-label', zh ? '显示 / 隐藏文件列表' : 'Show / hide file list')
   sourceToggleBtnEl().setAttribute('aria-label', zh ? '切换 Markdown 源码 / 所见即所得' : 'Toggle Markdown source / WYSIWYG')
-  updateFileRevealButton()
   const wordTip = wordCountEl().querySelector('.word-count-tip')
   if (wordTip) wordTip.textContent = zh ? '0 字 · 0 词 · 0 段' : '0 chars · 0 words · 0 paragraphs'
   updateSourceToggle()
@@ -1124,8 +1109,10 @@ function initPanelResize(): void {
 }
 
 function updateFileTitle(): void {
-  const name = currentFilePath ? (currentFilePath.split(/[\\/]/).pop() || currentFilePath) : (fileTitleEl().dataset.untitled || 'Untitled')
-  fileTitleEl().textContent = name
+  // The filename is shown by the tab; the window title is the only place left
+  // that needs it spelled out (there is no centred title in the title bar).
+  const name = currentFilePath ? (currentFilePath.split(/[\\/]/).pop() || currentFilePath) : (isChinese() ? '未命名' : 'Untitled')
+  document.title = name
 }
 
 function renderFileList(files: import('../preload/index').SiblingFile[]): void {
@@ -1356,7 +1343,6 @@ async function init(): Promise<void> {
   })
 
   fileToggleBtnEl().addEventListener('click', togglePanel)
-  revealFileBtnEl().addEventListener('click', () => { void api.revealFile() })
   // Right-click on a file panel entry opens the native context menu. The
   // parent entry has no target worth acting on, so it keeps the default.
   fileListEl().addEventListener('contextmenu', (e) => {
@@ -1439,7 +1425,6 @@ async function init(): Promise<void> {
       tab.revision = documentRevision
       tab.diskContent = data.content
     }
-    updateFileRevealButton()
     resetDirty()
     setContent(data.content, true)
     const resetScroll = () => {
