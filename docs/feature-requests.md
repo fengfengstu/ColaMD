@@ -46,6 +46,12 @@ The two items below are the ones actually blocking us. Everything else on this p
 
 These features are implemented on `main` and await release verification.
 
+### Themes as standalone files, with a guide for writing your own
+
+**Source:** [#91](https://github.com/marswaveai/ColaMD/issues/91)
+
+All twelve built-in themes already ship as standalone, commented CSS files in [`themes/`](../themes), and [`themes/README.md`](../themes/README.md) documents the variables, direct selectors, and the rule that omitted variables inherit the Light defaults. The request was filed because nobody could find them: the README named twelve themes without linking the folder. README and README_CN now link both files. Nothing else is owed here, so the issue is closed.
+
 ### Export Word (.docx)
 
 **Sources:** [#31](https://github.com/marswaveai/ColaMD/issues/31)
@@ -188,12 +194,6 @@ Rule kept: exactly nine cards. The order is documented in an HTML comment above 
 **Source:** [#95](https://github.com/marswaveai/ColaMD/issues/95)
 
 Theme, panel width and visibility, and language persist; window bounds and view zoom do not, so a 2K display has to be re-adjusted every launch. Store both alongside the existing preferences. Keep the two values independent so zoom does not get folded into the bounds, and only restore a window size the user actually changed.
-
-### Custom theme sample and documentation
-
-**Source:** [#91](https://github.com/marswaveai/ColaMD/issues/91)
-
-Custom themes work through CSS files in `~/.colamd/themes/`, discoverable only by reading the source; the bundled themes sit inside `app.asar` and cannot be opened for reference. Ship one annotated sample stylesheet (listing the available variables, which are required and which are optional) plus a short page covering the folder, the import flow, and load order. Ship the sample into the themes folder rather than adding an "export a built-in theme" pipeline.
 
 ### One row title bar with tabs
 

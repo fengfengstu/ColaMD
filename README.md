@@ -28,7 +28,7 @@ Whatever writes the file (an AI agent such as Claude Code or Codex, a script, or
 
 ## Themes
 
-Twelve built-in themes, six light, six dark, inspired by Bear, Notion, iA Writer, Kindle, Solarized, Nord, Gruvbox, and Dracula.
+Twelve built-in themes, six light, six dark, inspired by Bear, Notion, iA Writer, Kindle, Solarized, Nord, Gruvbox, and Dracula. Every one of them is also a standalone CSS file in [`themes/`](themes/), with a guide to [writing your own](themes/README.md).
 
 <p align="center">
   <img src="docs/images/theme-swatches.svg" alt="ColaMD themes" width="92%">
