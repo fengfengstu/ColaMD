@@ -2,6 +2,13 @@
 
 This is the holding list for requests that have a clear user need but are not committed roadmap work. Entries stay here until they are accepted into a release plan or explicitly declined.
 
+**Issue lifecycle rule (2026-09-15)** — the GitHub issue tracker is a work queue, not an archive. Keep `open` count at zero; do not let issues linger:
+
+1. **Fixed in code** → comment with root cause + verification, then close. The commit message references the issue number.
+2. **Big or unscheduled feature requests** → record them here (with need, scope and status), reply pointing to the entry, then close the issue. The list is the tracker; the issue is not.
+3. **Outdated or unreproducible reports** (old version, no reply, needs a machine we do not have) → close as not planned, and state exactly what a reopen requires (e.g. reproduce on the latest version + document/platform details).
+4. Requests that are declined for good go in this list under `Declined` with the reason — never silently closed.
+
 **How to read the labels**
 
 - `Help wanted` — we cannot finish it alone: it needs hardware, an environment, or a reproduction we do not have. Please comment on the linked issue; Chinese or English both fine.
