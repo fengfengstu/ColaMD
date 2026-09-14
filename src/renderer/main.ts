@@ -578,14 +578,26 @@ function bindTabBar(api: import('../preload/index').ElectronAPI): void {
     }
   }
   api.onTabMenuAction(handleTabMenuAction)
+  // Chromium re-dispatches hover events after the DOM under the pointer changes,
+  // with the same coordinates. Closing a tab rebuilds the strip, so the hint used
+  // to re-arm itself under a pointer that never moved and looked like it refused
+  // to go away (#90). A real hover always comes with new coordinates.
+  let lastHoverPoint = ''
   tabBarEl().addEventListener('mouseover', (e) => {
+    const point = `${e.clientX},${e.clientY}`
+    if (point === lastHoverPoint) return
+    lastHoverPoint = point
     const target = e.target as HTMLElement
     const entry = target.closest('.tab-entry') as HTMLElement | null
     if (entry) scheduleTabTip(entry, tabTipText(entry))
     else if (target.closest('.tab-new-btn')) scheduleTabTip(target.closest('.tab-new-btn') as HTMLElement, isChinese() ? '新建标签页 · ⌘T' : 'New tab · ⌘T')
     else hideTabTip()
   })
-  tabBarEl().addEventListener('mouseleave', hideTabTip)
+  tabBarEl().addEventListener('mouseleave', () => {
+    // Leaving clears the gate: coming back to the same pixel is a real hover.
+    lastHoverPoint = ''
+    hideTabTip()
+  })
   tabBarEl().addEventListener('contextmenu', (e) => {
     const entry = (e.target as HTMLElement).closest('.tab-entry') as HTMLElement | null
     const id = entry?.dataset.tabId
