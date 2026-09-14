@@ -797,6 +797,15 @@ ipcMain.handle('tab-context-menu', (event, payload: unknown) => {
   }
   if (typeof filePath === 'string' && filePath.length > 0) {
     items.push({ type: 'separator' })
+    // The rest of the menu sends actions back to the renderer; this one is a
+    // main-process job, so it runs here and needs no round trip.
+    items.push({
+      label: zh ? '在新窗口打开' : 'Open in New Window',
+      click: () => {
+        const opened = createWindow(filePath)
+        opened.focus()
+      }
+    })
     items.push({ label: zh ? '复制路径' : 'Copy path', click: () => clipboard.writeText(filePath) })
     items.push({ label: revealLabel(zh), click: () => shell.showItemInFolder(filePath) })
   }
