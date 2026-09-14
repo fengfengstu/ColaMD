@@ -11,6 +11,13 @@ const BASE_CONFIG = {
   // The sandbox iframe has no inherited app fonts; without an explicit CJK-capable
   // family Mermaid measures CJK labels too small and clips them vertically.
   fontFamily: '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
+  // Flowchart subgraph titles rendered as HTML get a foreignObject measured a
+  // hair too narrow for CJK: "桌面）" loses the right half of its closing glyph
+  // and reads as "桌面\" (#94). SVG text labels are measured with getBBox and
+  // never clip. Vertex labels keep their html layout, but the default 200px
+  // wrap width broke CJK labels into cramped multi-line nodes; 400px holds a
+  // typical label on one line like other editors render it.
+  flowchart: { htmlLabels: false, wrappingWidth: 400 },
   themeCSS: `
     .nodeLabel { line-height: 1.45; padding: 2px 3px; }
     .edgeLabel { line-height: 1.45; padding: 1px 3px; }
