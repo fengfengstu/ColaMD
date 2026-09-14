@@ -1138,10 +1138,10 @@ ipcMain.handle('export-pdf', async (event) => {
     const background = await win.webContents.executeJavaScript('getComputedStyle(document.body).backgroundColor') as string
     const cssKey = await win.webContents.insertCSS(
       `@media print {
-        /* The page margins belong to the page box, so they repeat on every page.
-           Passing them to printToPDF instead had no effect while this rule said
-           margin: 0, which is why the export looked unchanged. */
-        @page { margin: 20mm 18mm; }
+        /* The margins are the page's, so they repeat, and the page carries the
+           theme background: without it the margin area stays paper white and a
+           warm or dark theme ends up with a bright frame around every page. */
+        @page { margin: 20mm 18mm; background: ${background}; }
         html, body, #editor { height: auto !important; overflow: visible !important; background: ${background} !important; }
         #editor { margin: 0 !important; padding: 0 !important; }
         #editor .ProseMirror { min-height: auto !important; }
