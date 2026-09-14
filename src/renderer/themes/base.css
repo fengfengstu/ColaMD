@@ -13,44 +13,54 @@ html, body {
 }
 
 :root {
-  /* Zero when no tab bar is showing, so every height/top below keeps the
-     single-document layout identical to before tabs existed. */
+  /* Zero: the strip lives inside the 40px titlebar row, so the editor starts
+     right below it and nothing below needs a second offset. */
   --tab-bar-height: 0px;
   --editor-top-gap: 0px;
 }
 
-/* One chrome surface for the title bar and the tab strip (Chrome does the same):
-   the strip never draws its own divider, and the active tab is the paper colour
-   with an open bottom edge, so it reads as connected to the document. */
-body.has-tabs {
+body {
+  /* One chrome colour for the single top row. These MUST live on body, never
+     on :root: the themes override --bg-color/--text-color on body.theme-*, and
+     html never sees those overrides, so a :root definition bakes the light
+     theme's mix in and the titlebar stops following the theme entirely
+     (2026-09-15, found in the dark themes where the row stayed light grey and
+     the buttons vanished into it). Custom properties resolve where they are
+     DEFINED, not where they are used. */
   --chrome-bg: color-mix(in srgb, var(--text-color) 6%, var(--bg-color));
   /* Fully opaque, so the hovered tab and the close button that covers text use
      one solid colour instead of stacking translucent layers. */
   --chrome-bg-hover: color-mix(in srgb, var(--text-color) 6%, var(--chrome-bg));
-}
-
-body {
   --search-match-bg: color-mix(in srgb, var(--link-color) 18%, transparent);
   --search-match-current-bg: color-mix(in srgb, var(--link-color) 32%, transparent);
 }
 
 #titlebar {
+  /* The single top row. The strip, the save status and the three buttons are
+     all flex children of THIS element: one surface, one baseline, one stacking
+     order. (58f66f4 floated the strip above it with z-index 31; the broken
+     baseline, the wrong colour and the dead buttons all came from that split.)
+     Left padding clears the macOS traffic lights. */
   -webkit-app-region: drag;
   height: 40px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 6px 0 84px;
   background: var(--chrome-bg, transparent);
   position: relative;
+  /* The row's one baseline; the active tab (opaque paper, flush with the
+     bottom) cuts it out, so it opens into the document. */
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--text-color) 11%, transparent);
   /* Tooltips inside the titlebar must paint above the editor. */
   z-index: 30;
 }
 
 #save-status {
-  /* Anchored to the right-hand button cluster: there is no centred filename to
-     hang off any more. */
-  position: fixed;
-  right: 108px;
-  top: 20px;
-  transform: translateY(-50%);
+  /* A flex member of the row, left of the button cluster; the layout aligns
+     it, no fixed-position offsets. */
+  flex: none;
+  margin-right: 2px;
   white-space: nowrap;
   font-size: 11px;
   line-height: 1.3;
@@ -70,31 +80,21 @@ body {
    together with the strip. There is deliberately no plus in the title bar: it
    would disappear the moment the strip shows up. */
 #tab-bar {
-  /* One row of chrome: the strip lives inside the title bar's row, from the
-     traffic lights to the right-hand buttons. */
-  position: absolute;
-  top: 0;
-  left: 84px;
-  right: 150px;
-  height: 40px;
-  z-index: 31;
-  flex: none;
+  /* The strip is the titlebar's first flex child, not a floating sibling.
+     min-width: 0 lets it shrink so the buttons are never pushed out; overflow
+     scrolls the tabs instead. It paints nothing of its own: the surface and
+     the baseline belong to the titlebar. */
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: stretch;
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  /* The panel is not part of the strip: the tabs start at its right edge, and
-     run from the window edge when the panel is hidden. */
-  padding: 0;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
   background: transparent;
   -webkit-app-region: drag;
-  /* The strip's baseline runs under the whole bar, and the active tab (opaque
-     paper, flush with the bottom) cuts it out, so it opens into the document.
-     Dropped once while folding these rules: the tabs immediately stopped
-     reading as tabs. */
-  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--text-color) 11%, transparent);
 }
 
 #tab-bar[hidden] {
@@ -103,10 +103,6 @@ body {
 
 #tab-bar::-webkit-scrollbar {
   display: none;
-}
-
-body.show-file-panel #tab-bar {
-  left: calc(var(--file-panel-width, 220px) + 6px);
 }
 
 .tab-entry,
@@ -273,35 +269,18 @@ body.show-file-panel #tab-bar {
   display: none;
 }
 
-#file-toggle-btn {
-  position: absolute;
-  top: 6px;
-  right: 78px;  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-app-region: no-drag;
-  transition: background 0.15s, color 0.15s;
-}
-
 #file-toggle-btn:hover {
-  background: rgba(127, 127, 127, 0.14);
+  background: color-mix(in srgb, var(--text-color) 14%, transparent);
   color: var(--text-color);
 }
 
 #file-toggle-btn.active {
-  background: rgba(127, 127, 127, 0.14);
+  background: color-mix(in srgb, var(--text-color) 14%, transparent);
   color: var(--text-color);
 }
 
 #file-toggle-btn.active:hover {
-  background: rgba(127, 127, 127, 0.2);
+  background: color-mix(in srgb, var(--text-color) 20%, transparent);
 }
 
 /* A wide, invisible hit area bridging the gap to the title, so the pointer
@@ -311,10 +290,30 @@ body.show-file-panel #tab-bar {
    appearing out there is noise (design.md). The button stays hit-testable while
    hidden, otherwise it could never be reached or clicked. */
 /* Source (Markdown) / WYSIWYG toggle */
-#source-toggle-btn {
-  position: absolute;
-  top: 6px;
-  right: 42px;
+#source-toggle-btn:hover {
+  background: color-mix(in srgb, var(--text-color) 14%, transparent);
+  color: var(--text-color);
+}
+
+#source-toggle-btn.active {
+  background: color-mix(in srgb, var(--text-color) 14%, transparent);
+  color: var(--text-color);
+}
+
+#source-toggle-btn.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+#source-toggle-btn.disabled:hover {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+/* The three titlebar buttons share ONE box rule: same size, same radius, same
+   colours. Duplicating the box per button is how the word-count button lost
+   its border-radius while the other two kept theirs. */
+#titlebar > button {
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -329,30 +328,17 @@ body.show-file-panel #tab-bar {
   transition: background 0.15s, color 0.15s;
 }
 
-#source-toggle-btn:hover {
-  background: rgba(127, 127, 127, 0.14);
-  color: var(--text-color);
-}
-
-#source-toggle-btn.active {
-  background: rgba(127, 127, 127, 0.14);
-  color: var(--text-color);
-}
-
-#source-toggle-btn.disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-#source-toggle-btn.disabled:hover {
-  background: transparent;
-  color: var(--text-muted);
-}
-
-/* Top-right controls: keep labels hidden until their icon is hovered. */
+/* Top-right controls. The icon hover tint and the tooltip positioning are
+   SEPARATE rules on purpose: 58f66f4 fused the hover selectors into the tip's
+   block, which teleported and hid the buttons on hover (the "flicker /
+   unclickable" bug). Keep them apart. */
 #word-count:hover,
 #source-toggle-btn:hover,
-#file-toggle-btn:hover,
+#file-toggle-btn:hover {
+  background: color-mix(in srgb, var(--text-color) 14%, transparent);
+  color: var(--text-color);
+}
+
 .toolbar-tip {
   position: absolute;
   top: calc(100% + 6px);
@@ -376,7 +362,11 @@ body.show-file-panel #tab-bar {
   transition: transform 0.15s;
 }
 
-#titlebar > button:hover .toolbar-tip,
+#titlebar > button:hover .toolbar-tip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 #word-count {
   cursor: default;
 }
@@ -467,7 +457,11 @@ body.panel-resizing {
   padding: 2px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  background: rgba(127, 127, 127, 0.08);
+  /* The tray is the theme's raised chrome surface, not a hardcoded grey: a
+     hardcoded tint sits at the same luminance as the paper chip in dark themes
+     and the active state dissolves (2026-09-15). With --chrome-bg the chip
+     (paper) reads as pressed-in on dark and lifted on light. */
+  background: var(--chrome-bg);
 }
 
 .file-panel-tabs button {
@@ -478,7 +472,7 @@ body.panel-resizing {
   color: var(--text-muted);
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .file-panel-tabs button:hover {
@@ -488,7 +482,8 @@ body.panel-resizing {
 .file-panel-tabs button.active {
   background: var(--bg-color);
   color: var(--text-color);
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
+  /* Deliberately no shadow: a raised chip reads as hardware in an otherwise
+     flat shell (2026-09-15). The tray/chip contrast alone carries the state. */
 }
 
 #file-list,
@@ -585,23 +580,18 @@ body.panel-resizing {
 
 #file-list button:hover,
 #outline-list button:hover {
-  background: rgba(127, 127, 127, 0.14);
+  background: color-mix(in srgb, var(--text-color) 14%, transparent);
 }
 
-#file-list button.active {
-  background: rgba(241, 117, 45, 0.14);
-  color: #F1752D;
-}
-
-/* Reading-position entry: derived from the theme link color so every theme
-   adapts without per-theme values (#64). */
+/* Active entry in both lists: a NEUTRAL raised surface, not an accent colour.
+   The reading position is location, not importance, so it gets the same quiet
+   lifted chip in every theme (--chrome-bg-hover derives from the theme, stays
+   visible on dark and light); colour accents belong to the document, not the
+   shell. The old hardcoded orange (#F1752D) ignored themes entirely. */
+#file-list button.active,
 #outline-list button.active {
-  background: color-mix(in srgb, var(--link-color) 12%, transparent);
-  color: var(--link-color);
-}
-
-#outline-list button.active:hover {
-  background: color-mix(in srgb, var(--link-color) 18%, transparent);
+  background: var(--chrome-bg-hover);
+  color: var(--text-color);
 }
 
 /* Outline-jump feedback: the landing heading flashes once and fades (#64). */
@@ -625,11 +615,6 @@ body.panel-resizing {
 #file-list button.directory {
   color: var(--text-color);
   font-weight: 500;
-}
-
-#outline-list button.active {
-  background: rgba(241, 117, 45, 0.14);
-  color: #F1752D;
 }
 
 #file-list button.parent {
@@ -813,7 +798,7 @@ body.show-file-panel #source-editor {
 
 #editor > .code-copy-btn:hover,
 #editor > .code-copy-btn.copied {
-  background: rgba(127, 127, 127, 0.14);
+  background: color-mix(in srgb, var(--text-color) 14%, transparent);
   color: var(--text-color);
 }
 
@@ -1352,7 +1337,7 @@ body.web-playground *::-webkit-scrollbar-corner {
 }
 
 #update-banner-dismiss:hover {
-  background: rgba(127, 127, 127, 0.14);
+  background: color-mix(in srgb, var(--text-color) 14%, transparent);
   color: var(--text-color);
 }
 
