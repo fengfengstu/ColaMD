@@ -357,6 +357,13 @@ Fenced code blocks currently render as plain styled text with a copy button, wit
 
 ## Declined
 
+### Cross-directory file tree in the panel
+
+**Source:** [#96](https://github.com/marswaveai/ColaMD/issues/96)
+
+Declined (2026-09-15), after re-examining it rather than on first instinct. An expanding tree would bring expansion state, cached directory reads, and level navigation into a panel whose single job is the current document's folder, and the edge cases are exactly where such a tree gets expensive (deep paths in a 220px panel, hover and renaming per level, right-click menus at every depth). The user-facing answer is that a hierarchy is not being introduced for now. Tabs already hold documents from any path in one window, so cross-folder work has an answer that costs no new structure.
+
+
 ### System WebView shell (Tauri) migration
 
 **Declined (2026-09-13).** On macOS a system-WebView shell would collapse the download from 82 MB to roughly Typora's 14 MB, because the OS supplies the browser. It does not pay off anywhere else: Typora's own Windows installer is 86 to 108 MB for the same reason ours is 115 MB, there is no dependable system WebView on Windows, and WebKitGTK on Linux carries real distro and rendering risk. A main-process rewrite for one of three platforms is not worth it. Revisit only if ColaMD ever becomes macOS-only.
