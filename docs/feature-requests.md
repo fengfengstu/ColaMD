@@ -23,7 +23,7 @@ The two items below are the ones actually blocking us. Everything else on this p
 
 **Why it is stuck:** the maintainer only has macOS hardware. Startup time is already instrumented (`COLAMD_STARTUP_TRACE=1`), so a Windows user can produce a comparable trace; nobody has been able to run it on a machine that shows the stall.
 
-**How to help:** comment on [#78](https://github.com/marswaveai/ColaMD/issues/78) with your GPU and driver version, input method, document size, and whether the stutter changes when the document contains no Mermaid block or when autosave is off.
+**How to help:** comment on [#78](https://github.com/marswaveai/ColaMD/issues/78) (closed pending data; reopen with it) or open a new issue, with your GPU and driver version, input method, document size, and whether the stutter changes when the document contains no Mermaid block or when autosave is off.
 
 ### Image export failures
 
