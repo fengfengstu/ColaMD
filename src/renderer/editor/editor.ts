@@ -1,5 +1,6 @@
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx, serializerCtx, remarkPluginsCtx, remarkStringifyOptionsCtx } from '@milkdown/kit/core'
 import { Plugin, PluginKey, type EditorState } from '@milkdown/kit/prose/state'
+import type { Node as ProseMirrorNode } from '@milkdown/kit/prose/model'
 import { Decoration, DecorationSet, type EditorView } from '@milkdown/kit/prose/view'
 import remarkBreaks from 'remark-breaks'
 import { commonmark } from '@milkdown/kit/preset/commonmark'
@@ -406,6 +407,142 @@ function setupCodeBlockCopy(root: HTMLElement): void {
   resizeObserver.observe(root)
 }
 
+// --- Footnote hover preview (#25) ---
+// Hovering a footnote reference shows its definition in a floating card.
+// Data comes from the same ProseMirror document (no re-parsing, no IPC);
+// clicking a reference keeps its existing jump behavior.
+
+const FOOTNOTE_PREVIEW_DELAY = 300
+// Grace for the pointer to cross the gap between the reference and the card,
+// and for moving between the two halves of the hover zone.
+const FOOTNOTE_HIDE_GRACE = 120
+
+function setupFootnotePreview(root: HTMLElement): void {
+  const card = document.createElement('div')
+  card.className = 'footnote-preview'
+  card.hidden = true
+  root.appendChild(card)
+
+  let showTimer: ReturnType<typeof setTimeout> | null = null
+  let hideTimer: ReturnType<typeof setTimeout> | null = null
+  let currentRef: HTMLElement | null = null
+
+  const cancelHide = (): void => {
+    if (hideTimer) {
+      clearTimeout(hideTimer)
+      hideTimer = null
+    }
+  }
+
+  const hide = (): void => {
+    cancelHide()
+    if (showTimer) {
+      clearTimeout(showTimer)
+      showTimer = null
+    }
+    currentRef = null
+    card.hidden = true
+  }
+
+  // Leaving the zone does not hide immediately: the grace timer lets the
+  // pointer cross the gap between the reference and the card (review on #89).
+  const scheduleHide = (): void => {
+    cancelHide()
+    hideTimer = setTimeout(hide, FOOTNOTE_HIDE_GRACE)
+  }
+
+  // The hover zone is the reference plus the card itself, so the definition
+  // can be reached and scrolled.
+  const inZone = (el: EventTarget | null): boolean => {
+    return el instanceof HTMLElement && (card.contains(el) || (currentRef !== null && currentRef.contains(el)))
+  }
+
+  // Multi-block definitions must not run together: textContent alone would
+  // join paragraphs into one line. Labels match case-insensitively ([^Note]
+  // pairs with [^note]); footnote_definition only carries `label`.
+  const definitionText = (def: ProseMirrorNode): string => {
+    return Array.from({ length: def.childCount }, (_v, i) => def.child(i).textContent).join('\n\n')
+  }
+
+  const findDefinitionText = (label: string): string | null => {
+    const view = getEditorView()
+    if (!view) return null
+    const key = label.toLowerCase()
+    let text: string | null = null
+    view.state.doc.descendants((node) => {
+      if (text !== null) return false
+      if (node.type.name === 'footnote_definition' && String(node.attrs.label ?? '').toLowerCase() === key) {
+        text = definitionText(node)
+        return false
+      }
+      return true
+    })
+    return text
+  }
+
+  const show = (ref: HTMLElement): void => {
+    // The content may have been re-set while the timer ran; a detached
+    // reference must never surface a stale card.
+    if (!ref.isConnected) {
+      hide()
+      return
+    }
+    const label = ref.getAttribute('data-label') ?? ''
+    const text = label ? findDefinitionText(label) : null
+    if (text === null || !text.trim()) {
+      hide()
+      return
+    }
+    card.textContent = text
+    card.hidden = false
+    const refRect = ref.getBoundingClientRect()
+    const cardRect = card.getBoundingClientRect()
+    const left = Math.max(8, Math.min(refRect.left, window.innerWidth - cardRect.width - 8))
+    let top = refRect.bottom + 6
+    if (top + cardRect.height > window.innerHeight - 8) {
+      top = Math.max(8, refRect.top - cardRect.height - 6)
+    }
+    card.style.left = `${left}px`
+    card.style.top = `${top}px`
+  }
+
+  root.addEventListener('mouseover', (e) => {
+    const target = e.target as HTMLElement
+    // Hovering the card itself keeps it up so the definition can be scrolled.
+    if (card.contains(target)) {
+      cancelHide()
+      return
+    }
+    const ref = target.closest<HTMLElement>('sup[data-type="footnote_reference"]')
+    if (!ref) return
+    cancelHide()
+    if (ref === currentRef) return
+    if (showTimer) clearTimeout(showTimer)
+    currentRef = ref
+    showTimer = setTimeout(() => {
+      if (currentRef === ref) show(ref)
+    }, FOOTNOTE_PREVIEW_DELAY)
+  })
+  root.addEventListener('mouseout', (e) => {
+    if (!inZone(e.target)) return
+    if (inZone(e.relatedTarget)) {
+      // Moved within the zone (ref → card, card → ref, or inside either).
+      cancelHide()
+      return
+    }
+    scheduleHide()
+  })
+  // Fixed positioning goes stale the moment the document moves. Only the
+  // editor's own scroll hides the card: scrolling inside the card's overflow
+  // must not (bubbles through here otherwise).
+  root.addEventListener('scroll', (e) => {
+    if (e.target === root) hide()
+  }, { passive: true })
+  window.addEventListener('resize', hide)
+  // Clicking a reference jumps to the definition; the card must not linger.
+  root.addEventListener('click', hide)
+}
+
 // --- Format commands (#58): one pipeline for every format shortcut ---
 // Marks toggle on the selection; lists wrap the current block. Empty
 // selections are a no-op for marks, matching the previous cmd+B behavior.
@@ -503,6 +640,7 @@ export async function createEditor(
     : null
 
   setupCodeBlockCopy(root)
+  setupFootnotePreview(root)
 
   let editor = Editor.make()
     .config((ctx) => {
