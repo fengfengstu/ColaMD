@@ -183,6 +183,41 @@ Rule kept: exactly nine cards. The order is documented in an HTML comment above 
 
 ## Candidates
 
+### Remember window size and view zoom
+
+**Source:** [#95](https://github.com/marswaveai/ColaMD/issues/95)
+
+Theme, panel width and visibility, and language persist; window bounds and view zoom do not, so a 2K display has to be re-adjusted every launch. Store both alongside the existing preferences. Keep the two values independent so zoom does not get folded into the bounds, and only restore a window size the user actually changed.
+
+### Custom theme sample and documentation
+
+**Source:** [#91](https://github.com/marswaveai/ColaMD/issues/91)
+
+Custom themes work through CSS files in `~/.colamd/themes/`, discoverable only by reading the source; the bundled themes sit inside `app.asar` and cannot be opened for reference. Ship one annotated sample stylesheet (listing the available variables, which are required and which are optional) plus a short page covering the folder, the import flow, and load order. Ship the sample into the themes folder rather than adding an "export a built-in theme" pipeline.
+
+### One row title bar with tabs
+
+**Source:** [#90](https://github.com/marswaveai/ColaMD/issues/90)
+
+Following the tab strip, the title bar and the strip cost two rows of vertical space. Chrome collapses them into one. ColaMD's title bar also carries a centred filename and three buttons on the right, so the merge needs a decision about where those go before it is a visual change.
+
+### Tab reordering by drag
+
+**Source:** [#59](https://github.com/marswaveai/ColaMD/issues/59)
+
+Tabs can be opened and closed but not reordered. Not decided. Drag interactions have been declined elsewhere in the product (panel resize was replaced by fixed rules plus a narrow hot zone), so this needs the same question asked: does the value justify a drag affordance that appears nowhere else.
+
+### Renderer costs found while measuring startup (#100)
+
+**Source:** [#100](https://github.com/marswaveai/ColaMD/issues/100)
+
+Measured, not guessed, and cheap enough to be worth listing:
+
+- Word count runs three full-document regex passes about 200ms after typing stops, although the number is only shown on hover. Compute on demand or maintain incrementally.
+- KaTeX sits on the startup path: 473KB is parsed even for a document with no math. Lazy-load it the way mermaid already is.
+- `releaseMermaidRenderer()` destroys the sandbox iframe on every file open, so a document with diagrams rebuilds and recompiles them each time. Being checked together with [#94](https://github.com/marswaveai/ColaMD/issues/94).
+- Windows-only compositing costs (`backdrop-filter`, several `box-shadow`) on integrated graphics, and documents between the source-mode threshold and "large". Measure before touching.
+
 ### Portable build (zip distribution)
 
 **Sources:** [#63](https://github.com/marswaveai/ColaMD/issues/63), user feedback again on 2026-09-13
