@@ -188,6 +188,14 @@ interface WindowState {
   // Every file this window holds open in a tab, reported by the renderer. Used
   // to focus an existing tab instead of opening a duplicate window.
   tabFiles: string[]
+  // Files handed to a window whose renderer has not finished loading yet. Sent
+  // as tab-open requests once the renderer is ready AND the initial document
+  // has been delivered — an early tab-open would otherwise race the first
+  // 'file-opened' and both would land in the same tab.
+  pendingTabFiles: string[]
+  // True once the window's opening document (if any) has been handed to the
+  // renderer, i.e. tab-open requests can be processed safely.
+  initialDocDelivered: boolean
 }
 
 interface DocumentSnapshot {
@@ -213,7 +221,7 @@ const pendingDocumentStateRequests = new Map<string, PendingDocumentStateRequest
 function getState(win: BrowserWindow): WindowState {
   let state = windowStates.get(win.id)
   if (!state) {
-    state = { filePath: null, browsePath: null, watcher: null, isInternalSave: false, internalSaveCount: 0, lastKnownMtime: 0, lastInternalSaveContent: null, debounceTimer: null, siblingsTimer: null, dirty: false, closePromise: null, rendererReady: false, writeQueue: Promise.resolve(), closeAuthorized: false, tabFiles: [] }
+    state = { filePath: null, browsePath: null, watcher: null, isInternalSave: false, internalSaveCount: 0, lastKnownMtime: 0, lastInternalSaveContent: null, debounceTimer: null, siblingsTimer: null, dirty: false, closePromise: null, rendererReady: false, writeQueue: Promise.resolve(), closeAuthorized: false, tabFiles: [], pendingTabFiles: [], initialDocDelivered: false }
     windowStates.set(win.id, state)
   }
   return state
@@ -282,11 +290,41 @@ function createWindow(filePath?: string, initialContent?: string, initialBrowseP
 
   win.webContents.on('did-finish-load', () => {
     markStartup('renderer-loaded')
-    if (filePath) {
-      loadFileInWindow(win, filePath)
-    } else if (initialContent) {
-      // In-memory content (e.g. the Markdown cheatsheet) — no file, no watcher
-      win.webContents.send('file-opened', { path: null, content: initialContent })
+    const deliver = (): void => {
+      if (filePath) {
+        // The queued tab-opens must go out only after this document's
+        // 'file-opened', otherwise both land in the same tab.
+        void loadFileInWindow(win, filePath).then(() => {
+          getState(win).initialDocDelivered = true
+          flushPendingTabFiles(win)
+        })
+      } else if (initialContent) {
+        // In-memory content (e.g. the Markdown cheatsheet) — no file, no watcher
+        win.webContents.send('file-opened', { path: null, content: initialContent })
+        getState(win).initialDocDelivered = true
+        flushPendingTabFiles(win)
+      } else {
+        getState(win).initialDocDelivered = true
+        flushPendingTabFiles(win)
+      }
+    }
+    // Wait for the renderer to be listening: a 'file-opened' that arrives
+    // before init registers its handlers is dropped, and the window opens
+    // empty. Polling here is bounded by the renderer's own init time.
+    if (getState(win).rendererReady) {
+      deliver()
+    } else {
+      const poll = setInterval(() => {
+        if (win.isDestroyed() || getState(win).rendererReady) {
+          clearInterval(poll)
+          if (!win.isDestroyed()) deliver()
+        }
+      }, 30)
+      // Unstoppable safety net: never block delivery forever.
+      setTimeout(() => {
+        clearInterval(poll)
+        if (!win.isDestroyed() && !getState(win).initialDocDelivered) deliver()
+      }, 10_000)
     }
   })
 
@@ -501,7 +539,7 @@ function restoreImagePaths(content: string, filePath: string): string {
   })
 }
 
-function loadFileInWindow(win: BrowserWindow, filePath: string): void {
+function loadFileInWindow(win: BrowserWindow, filePath: string): Promise<void> {
   const state = getState(win)
   const operation = async (): Promise<void> => {
     try {
@@ -521,6 +559,7 @@ function loadFileInWindow(win: BrowserWindow, filePath: string): void {
   }
   const next = state.writeQueue.then(operation, operation)
   state.writeQueue = next.then(() => undefined, () => undefined)
+  return next
 }
 
 // Find window that already has this file open, either as its active document or
@@ -536,7 +575,40 @@ function findWindowForFile(filePath: string): BrowserWindow | null {
   return null
 }
 
-// Open file: reuse existing window or create new one
+// The focused window, or the most recently created one when nothing is
+// focused (e.g. the user clicked a dock icon). Used to decide where documents
+// arriving from outside the window land.
+function focusedOrLastWindow(): BrowserWindow | null {
+  const focused = BrowserWindow.getFocusedWindow()
+  if (focused && !focused.isDestroyed()) return focused
+  const windows = BrowserWindow.getAllWindows()
+  for (let i = windows.length - 1; i >= 0; i--) {
+    if (!windows[i].isDestroyed()) return windows[i]
+  }
+  return null
+}
+
+// Hand a file to a window as a new tab. Until the renderer is up AND its
+// opening document has been delivered it cannot process the request, so park
+// it and flush later.
+function openFileAsTab(target: BrowserWindow, filePath: string): void {
+  const state = getState(target)
+  if (!state.rendererReady || !state.initialDocDelivered) {
+    state.pendingTabFiles.push(filePath)
+    return
+  }
+  target.webContents.send('open-in-new-tab', filePath)
+}
+
+function flushPendingTabFiles(win: BrowserWindow): void {
+  const state = getState(win)
+  if (!state.rendererReady || !state.initialDocDelivered) return
+  const queued = state.pendingTabFiles.splice(0)
+  for (const fp of queued) win.webContents.send('open-in-new-tab', fp)
+}
+
+// Open file: reuse existing window, else land as a tab in the current window
+// (design.md: files open into the current window, not a new one each time).
 function openFile(filePath: string): void {
   // If already open, focus that window
   const existing = findWindowForFile(filePath)
@@ -550,6 +622,16 @@ function openFile(filePath: string): void {
   if (emptyWin) {
     loadFileInWindow(emptyWin, filePath)
     emptyWin.focus()
+    return
+  }
+
+  // The document is open nowhere: it becomes a new tab of the window the user
+  // is in, instead of one more window on the pile (#99).
+  const target = focusedOrLastWindow()
+  if (target) {
+    openFileAsTab(target, filePath)
+    if (target.isMinimized()) target.restore()
+    target.focus()
     return
   }
 
@@ -1565,6 +1647,12 @@ function buildMenu(): void {
       label: labels.theme,
       submenu: themeSubmenu
     },
+    // The Window menu is not cosmetic: macOS injects the system window-tiling
+    // commands (System Settings → Keyboard → Keyboard Shortcuts → Windows, e.g.
+    // ⌃⌥⌘←) into whichever menu is registered via setWindowsMenu. Electron does
+    // that only for role 'windowMenu' — without it every tiling shortcut is
+    // dead in the app (#97).
+    ...(isMac ? [{ role: 'windowMenu' as const }] : []),
     {
       label: labels.help,
       submenu: [
@@ -1703,7 +1791,42 @@ ipcMain.handle('install-update', () => {
 
 // App lifecycle
 
+// --- Single instance (#99, #100) ---
+// A second launch while ColaMD runs must not become a second process: it
+// doubles memory, shows two menu bars, and its renderer stalls ~4 seconds on
+// the first instance's LevelDB lock for Local Storage before giving up on
+// writing theme/state preferences. The second launch's files arrive in
+// 'second-instance' and open as tabs of the existing window instead.
+const hasSingleInstanceLock = app.requestSingleInstanceLock()
+if (!hasSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, argv) => {
+    // Keep files only: the app-path argument (".") and stray directories are
+    // not documents.
+    const fileArgs = argv.slice(app.isPackaged ? 1 : 2)
+      .filter((arg) => !arg.startsWith('-'))
+      .filter((arg) => {
+        try { return !statSync(arg).isDirectory() } catch { return true }
+      })
+    if (fileArgs.length === 0) {
+      // Plain re-launch: bring the app the user already has back to front.
+      const target = focusedOrLastWindow()
+      if (target) {
+        if (target.isMinimized()) target.restore()
+        target.show()
+        target.focus()
+      } else {
+        createWindow()
+      }
+      return
+    }
+    for (const fp of fileArgs) openFile(fp)
+  })
+}
+
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return
   markStartup('app-ready')
   ensureThemesDir()
   buildMenu()
@@ -1716,9 +1839,11 @@ app.whenReady().then(() => {
   }
 
   if (pendingFilePaths.length > 0) {
-    for (const fp of pendingFilePaths) {
-      createWindow(fp)
-    }
+    // The first argument becomes the window; the rest open as its tabs (#99)
+    // instead of one window per file.
+    const [first, ...rest] = pendingFilePaths
+    const firstWindow = createWindow(first)
+    for (const fp of rest) openFileAsTab(firstWindow, fp)
     pendingFilePaths = []
   } else {
     // Start with an empty editor and no directory scan. Bundled examples stay
@@ -1777,7 +1902,12 @@ ipcMain.on('document-state-response', (event, requestId: unknown, snapshot: unkn
 
 ipcMain.on('renderer-ready', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
-  if (win) getState(win).rendererReady = true
+  if (win) {
+    getState(win).rendererReady = true
+    // Files queued before the renderer could listen (multi-file launch, early
+    // second-instance) go out now.
+    flushPendingTabFiles(win)
+  }
   markStartup('renderer-ready')
   writeStartupTrace()
 })

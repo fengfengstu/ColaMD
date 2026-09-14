@@ -313,6 +313,11 @@ function renderTabBar(): void {
   document.documentElement.style.setProperty('--tab-bar-height', visible ? `${TAB_BAR_HEIGHT}px` : '0px')
   document.documentElement.style.setProperty('--editor-top-gap', visible ? `${TAB_BAR_TOP_GAP}px` : '0px')
   bar.innerHTML = ''
+  // Hide the hover hint unconditionally, including the path where the whole
+  // strip disappears (one tab left): a pending timer would otherwise pop "⌘W"
+  // for a tab that no longer exists, and a visible hint would never leave —
+  // the strip it belongs to is gone, so no mouseleave can fire (#90).
+  hideTabTip()
   if (!visible) return
   for (const tab of tabs) {
     const entry = document.createElement('div')
@@ -346,7 +351,6 @@ function renderTabBar(): void {
   bar.append(add)
   const active = bar.querySelector('.tab-entry.active')
   active?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  hideTabTip()
   // Let the main process know which files this window holds in tabs, so opening
   // an already open document can focus that tab instead of duplicating it.
   window.electronAPI.setTabFiles(tabs.map((tab) => tab.filePath).filter((path): path is string => !!path))
@@ -532,6 +536,11 @@ async function openFileInNewTab(path: string): Promise<void> {
     return
   }
   await openNewTab()
+  // Claim the path before the 'file-opened' round-trip lands: a burst of
+  // queued tab-opens would otherwise see this tab as still blank and reuse it
+  // for the next file, overwriting the one just opened (#99).
+  const claimed = activeTab()
+  if (claimed) claimed.filePath = path
   await window.electronAPI.openSibling(path)
 }
 
@@ -548,11 +557,19 @@ async function closeTabsMatching(keep: (index: number) => boolean): Promise<void
 }
 
 function bindTabBar(api: import('../preload/index').ElectronAPI): void {
+  // Tab-opens are serialized: each request awaits main (activateFile,
+  // file-opened) before the next runs. Without this, a burst of queued opens
+  // (multi-file launch, fast second-instance) interleaves and two documents
+  // land in one tab (#99).
+  let tabOpenQueue: Promise<void> = Promise.resolve()
+  const enqueueTabOpen = (path: string): void => {
+    tabOpenQueue = tabOpenQueue.then(() => openFileInNewTab(path)).catch(() => { /* next file still opens */ })
+  }
   // Tabs are also created from the File menu / ⌘T and from the file list; the
   // strip's own plus is bound above, in renderTabBar.
   api.onMenuNewTab(() => { void openNewTab() })
   api.onMenuCloseTab(() => { if (activeTabId) void closeTab(activeTabId) })
-  api.onOpenInNewTab((path) => { void openFileInNewTab(path) })
+  api.onOpenInNewTab(enqueueTabOpen)
   const handleTabMenuAction = ({ action, tabId }: { action: string; tabId: string }) => {
     if (action === 'close') { void closeTab(tabId); return }
     if (action === 'close-others') { void closeTabsMatching((i) => tabs[i].id !== tabId); return }
@@ -1307,6 +1324,10 @@ async function init(): Promise<void> {
       tabs: tabs.filter((tab) => tab.dirty).map((tab) => ({ path: tab.filePath, content: tab.content }))
     })
   })
+  // Report readiness only after every listener is registered — the main process
+  // reacts to this signal by flushing queued tab-opens and by trusting the
+  // window with close/quit flows. It sat mid-init once and the flush raced
+  // bindTabBar: files handed over at launch were dropped silently.
   api.reportRendererReady()
 
   // Save before switching files. If saving is cancelled or fails, preserve the
