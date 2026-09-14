@@ -1138,20 +1138,18 @@ ipcMain.handle('export-pdf', async (event) => {
     const background = await win.webContents.executeJavaScript('getComputedStyle(document.body).backgroundColor') as string
     const cssKey = await win.webContents.insertCSS(
       `@media print {
-        @page { margin: 0; }
+        /* The page margins belong to the page box, so they repeat on every page.
+           Passing them to printToPDF instead had no effect while this rule said
+           margin: 0, which is why the export looked unchanged. */
+        @page { margin: 20mm 18mm; }
         html, body, #editor { height: auto !important; overflow: visible !important; background: ${background} !important; }
-        /* The page margins come from printToPDF, so they repeat on every page.
-           A padding on #editor only padded the document as a whole, which left
-           pages two onwards with text running to the paper edge. */
         #editor { margin: 0 !important; padding: 0 !important; }
         #editor .ProseMirror { min-height: auto !important; }
       }`
     )
     try {
-      // 20mm top and bottom, 18mm left and right: page proportions, so a printed
-      // document reads like a document instead of a screenshot of the editor.
       const pdfData = await win.webContents.printToPDF({
-        margins: { top: 0.79, bottom: 0.79, left: 0.71, right: 0.71 },
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
         printBackground: true,
         pageSize: 'A4'
       })

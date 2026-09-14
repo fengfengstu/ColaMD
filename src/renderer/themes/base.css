@@ -90,6 +90,19 @@ body {
   scrollbar-width: none;
   background: transparent;
   -webkit-app-region: drag;
+  /* The strip's baseline runs under the whole bar, and the active tab (opaque
+     paper, flush with the bottom) cuts it out, so it opens into the document.
+     Dropped once while folding these rules: the tabs immediately stopped
+     reading as tabs. */
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--text-color) 11%, transparent);
+}
+
+#tab-bar[hidden] {
+  display: none;
+}
+
+#tab-bar::-webkit-scrollbar {
+  display: none;
 }
 
 body.show-file-panel #tab-bar {
@@ -101,17 +114,6 @@ body.show-file-panel #tab-bar {
   -webkit-app-region: no-drag;
 }
 
-#tab-bar[hidden] {
-  display: none;
-}
-
-#tab-bar::-webkit-scrollbar {
-  display: none;
-}
-
-/* From two tabs up the strip shares the title bar's row: one row of chrome at
-   the top of the window, and the filename gives way to it (the active tab already
-   carries the name). The empty part of the strip still drags the window. */
 /* The plus sits at the end of the strip, right after the last tab. */
 .tab-new-btn {
   flex: none;
