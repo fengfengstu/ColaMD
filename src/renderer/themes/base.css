@@ -124,6 +124,47 @@ body {
   display: none;
 }
 
+/* From two tabs up the strip shares the title bar's row: one row of chrome at
+   the top of the window, and the filename gives way to it (the active tab already
+   carries the name). The empty part of the strip still drags the window. */
+body.has-tabs #tab-bar {
+  position: absolute;
+  top: 0;
+  left: 84px;
+  right: 150px;
+  height: 40px;
+  z-index: 31;
+  padding: 0;
+  background: transparent;
+  -webkit-app-region: drag;
+}
+
+body.has-tabs .tab-entry,
+body.has-tabs .tab-new-btn {
+  -webkit-app-region: no-drag;
+}
+
+body.has-tabs #title-center {
+  /* No longer a centring box for a filename: it only anchors the save status. */
+  transform: none;
+  max-width: none;
+}
+
+body.has-tabs #file-title,
+body.has-tabs #reveal-file-btn {
+  display: none;
+}
+
+body.has-tabs #save-status {
+  /* The filename is gone from this layout, so the indicator is anchored to the
+     right-hand button cluster instead of the title. */
+  position: fixed;
+  left: auto;
+  right: 108px;
+  top: 20px;
+  transform: translateY(-50%);
+}
+
 /* The plus sits at the end of the strip, right after the last tab. */
 .tab-new-btn {
   flex: none;

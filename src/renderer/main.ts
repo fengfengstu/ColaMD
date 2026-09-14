@@ -221,7 +221,6 @@ function markActiveTabDirty(): void {
   entry?.classList.toggle('dirty', dirty)
 }
 
-const TAB_BAR_HEIGHT = 36
 // The tab hint waits before it appears: hovering a tab is usually a prelude to
 // clicking it, and a label that jumps out immediately is noise.
 const TAB_TIP_DELAY = 1000
@@ -263,10 +262,6 @@ function hideTabTip(): void {
   const tip = document.getElementById('tab-tip') as HTMLElement | null
   if (tip) tip.hidden = true
 }
-// Space between the tab strip and the document, matching the editor's side
-// padding so the page does not start right under the tabs.
-const TAB_BAR_TOP_GAP = 18
-
 function closeGlyph(): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.setAttribute('width', '9')
@@ -310,8 +305,10 @@ function renderTabBar(): void {
   const visible = tabs.length > 1
   bar.hidden = !visible
   document.body.classList.toggle('has-tabs', visible)
-  document.documentElement.style.setProperty('--tab-bar-height', visible ? `${TAB_BAR_HEIGHT}px` : '0px')
-  document.documentElement.style.setProperty('--editor-top-gap', visible ? `${TAB_BAR_TOP_GAP}px` : '0px')
+  // The strip lives inside the title bar's row now, so it consumes no height of
+  // its own: the editor starts right under the same 40px row either way.
+  document.documentElement.style.setProperty('--tab-bar-height', '0px')
+  document.documentElement.style.setProperty('--editor-top-gap', '0px')
   bar.innerHTML = ''
   // Hide the hover hint unconditionally, including the path where the whole
   // strip disappears (one tab left): a pending timer would otherwise pop "⌘W"
