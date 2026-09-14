@@ -1140,13 +1140,18 @@ ipcMain.handle('export-pdf', async (event) => {
       `@media print {
         @page { margin: 0; }
         html, body, #editor { height: auto !important; overflow: visible !important; background: ${background} !important; }
-        #editor { margin-left: 0 !important; padding: 20mm !important; }
+        /* The page margins come from printToPDF, so they repeat on every page.
+           A padding on #editor only padded the document as a whole, which left
+           pages two onwards with text running to the paper edge. */
+        #editor { margin: 0 !important; padding: 0 !important; }
         #editor .ProseMirror { min-height: auto !important; }
       }`
     )
     try {
+      // 20mm top and bottom, 18mm left and right: page proportions, so a printed
+      // document reads like a document instead of a screenshot of the editor.
       const pdfData = await win.webContents.printToPDF({
-        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        margins: { top: 0.79, bottom: 0.79, left: 0.71, right: 0.71 },
         printBackground: true,
         pageSize: 'A4'
       })
