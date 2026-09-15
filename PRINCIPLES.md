@@ -72,8 +72,9 @@
 2. 版本号、`resources/demo/changelog.md`、README 路线图（中英同步）四处对齐。changelog 里本版那一段同时就是 Release 页面的正文（CI 直接取用；缺了段落会警告并退回 PR 列表，仍然发布）
 3. 提交信息写清本版包含哪些修复
 4. 打 tag 推送，等 CI 三平台全绿，再核对 Release 资产齐全：macOS 双架构各自的 dmg 与 zip、Windows 的 exe 与免安装 zip、Linux 的 AppImage 与 deb，以及 blockmap 和 latest*.yml
-5. 发版后在真机安装核对：能启动，且本版声称修好的问题确实可见
-6. 补 `docs/social/` 的对外文案
+5. 核对不必下载整包（一个 dmg 上百 MB，只在需要怀疑上传损坏时才值）：`latest-mac.yml` / `latest.yml` 里声明的 size 与 Release 页资产的实际 size 逐一相等，就说明上传完整；公证看 macOS 构建日志里的 `notarization successful`，两个架构各一条。剩下真正只能靠下载得到的是 sha512 逐字节一致和挂载后的 Gatekeeper 结论，这两项按需再做
+6. 发版后在真机安装核对：能启动，且本版声称修好的问题确实可见
+7. 补 `docs/social/` 的对外文案
 
 **本地验证打包**（细节与实测数据见 [docs/packaging.md](docs/packaging.md)）
 
