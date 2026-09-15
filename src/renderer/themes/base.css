@@ -656,6 +656,8 @@ body.panel-resizing {
   font-weight: 500;
 }
 
+/* The parent row keeps the same box as the rest: the name sits where a file or
+   folder icon sits, the way a back entry does in a file manager. */
 #file-list button.parent {
   color: var(--text-secondary, var(--text-muted));
   border-bottom: 1px solid var(--border-color);
@@ -663,7 +665,7 @@ body.panel-resizing {
   margin-bottom: 4px;
 }
 
-#file-list button.parent .file-entry-icon {
+#file-list button.parent .file-entry-chevron {
   color: var(--text-muted);
 }
 

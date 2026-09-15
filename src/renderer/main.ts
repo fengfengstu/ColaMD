@@ -1219,17 +1219,16 @@ function renderFileList(files: import('../preload/index').SiblingFile[]): void {
     const btn = document.createElement('button')
     btn.style.paddingLeft = `${indent}px`
     const chevron = document.createElement('span')
-    chevron.className = `file-entry-chevron${row.expanded ? ' expanded' : ''}`
+    chevron.className = `file-entry-chevron${row.expanded ? ' expanded' : ''}${f.kind === 'parent' ? ' back' : ''}`
     chevron.setAttribute('aria-hidden', 'true')
-    if (row.expandable) chevron.innerHTML = '<svg viewBox="0 0 10 10"><path d="M3.5 1.5 7 5l-3.5 3.5"/></svg>'
+    if (f.kind === 'parent') chevron.innerHTML = '<svg viewBox="0 0 16 16"><path d="M13 8H3.5M7 4 3 8l4 4"/></svg>'
+    else if (row.expandable) chevron.innerHTML = '<svg viewBox="0 0 10 10"><path d="M3.5 1.5 7 5l-3.5 3.5"/></svg>'
     const icon = document.createElement('span')
     icon.className = `file-entry-icon ${f.kind}`
     icon.setAttribute('aria-hidden', 'true')
-    icon.innerHTML = f.kind === 'parent'
-      ? '<svg viewBox="0 0 16 16"><path d="M13 8H3.5M7 4 3 8l4 4"/></svg>'
-      : f.kind === 'directory'
-        ? '<svg viewBox="0 0 16 16"><path d="M2.5 4.5h4l1.5 1.5h6v6.5h-11.5z"/><path d="M2.5 4.5v-1h4l1.5 1.5"/></svg>'
-        : '<svg viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4z"/><path d="M9 2.5v3h3"/></svg>'
+    icon.innerHTML = f.kind === 'directory'
+      ? '<svg viewBox="0 0 16 16"><path d="M2.5 4.5h4l1.5 1.5h6v6.5h-11.5z"/><path d="M2.5 4.5v-1h4l1.5 1.5"/></svg>'
+      : '<svg viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4z"/><path d="M9 2.5v3h3"/></svg>'
     const label = document.createElement('span')
     label.className = 'file-entry-name'
     label.textContent = f.kind === 'parent' ? '..' : f.name
@@ -1255,7 +1254,11 @@ function renderFileList(files: import('../preload/index').SiblingFile[]): void {
     btn.classList.toggle('directory', f.kind === 'directory')
     btn.classList.toggle('parent', f.kind === 'parent')
     if (f.path === currentFilePath) btn.classList.add('active')
-    btn.append(chevron, icon, label)
+    // The way back sits in the expander's column and its name takes the icon's,
+    // so the row reads left to right like every other one instead of hanging a
+    // column in. It has no icon of its own, which is why no slot is skipped.
+    if (f.kind === 'parent') btn.append(chevron, label)
+    else btn.append(chevron, icon, label)
     li.appendChild(btn)
     list.appendChild(li)
   }
