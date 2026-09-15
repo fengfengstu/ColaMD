@@ -33,6 +33,7 @@ export interface ElectronAPI {
   showTabContextMenu: (payload: { tabId: string; filePath: string | null; canCloseOthers: boolean; canCloseRight: boolean }) => Promise<void>
   onTabMenuAction: (callback: (payload: { action: string; tabId: string }) => void) => void
   listSiblings: () => Promise<SiblingFile[] | null>
+  listDirectory: (path: string) => Promise<SiblingFile[] | null>
   openSibling: (path: string) => Promise<boolean>
   activateFile: (path: string | null) => Promise<{ content: string; mtime: number } | null>
   setTabFiles: (paths: string[]) => void
@@ -102,6 +103,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('tab-menu-action', (_event, payload: { action: string; tabId: string }) => callback(payload))
   },
   listSiblings: () => ipcRenderer.invoke('list-siblings'),
+  listDirectory: (path: string) => ipcRenderer.invoke('list-directory', path),
   openSibling: (path: string) => ipcRenderer.invoke('open-sibling', path),
   activateFile: (path: string | null) => ipcRenderer.invoke('activate-file', path) as Promise<{ content: string; mtime: number } | null>,
   setTabFiles: (paths: string[]) => { ipcRenderer.send('set-tab-files', paths) },

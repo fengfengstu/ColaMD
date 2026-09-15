@@ -382,6 +382,29 @@ async function saveTabForLeaving(tab: DocumentTab | null): Promise<boolean> {
   return await saveCurrent()
 }
 
+// The window always holds at least one document, so the strip never shows a
+// lone plus next to a welcome screen that belongs to no tab: a launch with no
+// file seeds the first tab here, and a file that arrives later adopts it.
+function ensureTab(): DocumentTab {
+  const existing = activeTab()
+  if (existing) return existing
+  const tab: DocumentTab = {
+    id: `tab-${nextTabId++}`,
+    filePath: null,
+    dirty: false,
+    revision: documentRevision,
+    sourceMode: false,
+    sourceText: '',
+    content: '',
+    editorState: null,
+    diskContent: null,
+    scrollTop: 0
+  }
+  tabs.push(tab)
+  activeTabId = tab.id
+  return tab
+}
+
 async function openNewTab(): Promise<void> {
   const previous = activeTab()
   captureActiveTab()
@@ -1115,20 +1138,97 @@ function updateFileTitle(): void {
   document.title = name
 }
 
+// --- File panel: one root, expanded downward ---
+// The root is the open document's directory and `..` stays the one way back
+// up; a directory is read only when it is expanded, so a deep tree costs
+// nothing until the reader asks for it. Expansion lives in memory only — no
+// workspace, nothing restored on the next launch.
+const PANEL_INDENT = 12
+let panelRoot: import('../preload/index').SiblingFile[] = []
+const panelChildren = new Map<string, import('../preload/index').SiblingFile[]>()
+const panelExpanded = new Set<string>()
+const panelLoading = new Set<string>()
+
+type PanelRow = {
+  file: import('../preload/index').SiblingFile
+  depth: number
+  expandable: boolean
+  expanded: boolean
+  empty: boolean
+}
+
+// Flatten the expanded tree into visible rows. Rendering stays a flat list, so
+// hover, active state and hit-testing keep working the way they always have.
+function panelRows(): PanelRow[] {
+  const rows: PanelRow[] = []
+  const walk = (entries: import('../preload/index').SiblingFile[], depth: number): void => {
+    for (const file of entries) {
+      const expanded = file.kind === 'directory' && panelExpanded.has(file.path)
+      rows.push({ file, depth, expandable: file.kind === 'directory', expanded, empty: false })
+      if (!expanded) continue
+      const children = panelChildren.get(file.path)
+      if (!children) {
+        void loadPanelDirectory(file.path)
+        continue
+      }
+      if (children.length === 0) rows.push({ file, depth: depth + 1, expandable: false, expanded: false, empty: true })
+      else walk(children, depth + 1)
+    }
+  }
+  walk(panelRoot, 0)
+  return rows
+}
+
+function loadPanelDirectory(dir: string): void {
+  if (panelLoading.has(dir)) return
+  panelLoading.add(dir)
+  void window.electronAPI.listDirectory(dir).then((children) => {
+    panelLoading.delete(dir)
+    if (!children) return
+    panelChildren.set(dir, children)
+    renderFileList(panelRoot)
+  })
+}
+
+function togglePanelDirectory(dir: string): void {
+  if (panelExpanded.has(dir)) panelExpanded.delete(dir)
+  else {
+    panelExpanded.add(dir)
+    loadPanelDirectory(dir)
+  }
+  renderFileList(panelRoot)
+}
+
 function renderFileList(files: import('../preload/index').SiblingFile[]): void {
+  panelRoot = files
   const list = fileListEl()
   list.innerHTML = ''
-  for (const f of files) {
+  for (const row of panelRows()) {
     const li = document.createElement('li')
+    const indent = 8 + row.depth * PANEL_INDENT
+    if (row.empty) {
+      const empty = document.createElement('div')
+      empty.className = 'file-empty'
+      empty.style.paddingLeft = `${indent}px`
+      empty.textContent = isChinese() ? '这个文件夹是空的' : 'This folder is empty'
+      li.appendChild(empty)
+      list.appendChild(li)
+      continue
+    }
+    const f = row.file
     const btn = document.createElement('button')
+    btn.style.paddingLeft = `${indent}px`
+    const chevron = document.createElement('span')
+    chevron.className = `file-entry-chevron${row.expanded ? ' expanded' : ''}${f.kind === 'parent' ? ' back' : ''}`
+    chevron.setAttribute('aria-hidden', 'true')
+    if (f.kind === 'parent') chevron.innerHTML = '<svg viewBox="0 0 16 16"><path d="M13 8H3.5M7 4 3 8l4 4"/></svg>'
+    else if (row.expandable) chevron.innerHTML = '<svg viewBox="0 0 10 10"><path d="M3.5 1.5 7 5l-3.5 3.5"/></svg>'
     const icon = document.createElement('span')
     icon.className = `file-entry-icon ${f.kind}`
     icon.setAttribute('aria-hidden', 'true')
-    icon.innerHTML = f.kind === 'parent'
-      ? '<svg viewBox="0 0 16 16"><path d="M13 8H3.5M7 4 3 8l4 4"/></svg>'
-      : f.kind === 'directory'
-        ? '<svg viewBox="0 0 16 16"><path d="M2.5 4.5h4l1.5 1.5h6v6.5h-11.5z"/><path d="M2.5 4.5v-1h4l1.5 1.5"/></svg>'
-        : '<svg viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4z"/><path d="M9 2.5v3h3"/></svg>'
+    icon.innerHTML = f.kind === 'directory'
+      ? '<svg viewBox="0 0 16 16"><path d="M2.5 4.5h4l1.5 1.5h6v6.5h-11.5z"/><path d="M2.5 4.5v-1h4l1.5 1.5"/></svg>'
+      : '<svg viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4z"/><path d="M9 2.5v3h3"/></svg>'
     const label = document.createElement('span')
     label.className = 'file-entry-name'
     label.textContent = f.kind === 'parent' ? '..' : f.name
@@ -1145,14 +1245,20 @@ function renderFileList(files: import('../preload/index').SiblingFile[]): void {
       label.style.removeProperty('--file-entry-scroll-duration')
     })
     btn.title = f.kind === 'directory'
-      ? (isChinese() ? `打开 ${f.name}` : `Open ${f.name}`)
+      ? (isChinese()
+          ? `${row.expanded ? '收起' : '展开'} ${f.name}`
+          : `${row.expanded ? 'Collapse' : 'Expand'} ${f.name}`)
       : f.kind === 'parent' ? (isChinese() ? '返回上级目录' : 'Go to parent directory') : f.name
     btn.dataset.path = f.path
     btn.dataset.kind = f.kind
     btn.classList.toggle('directory', f.kind === 'directory')
     btn.classList.toggle('parent', f.kind === 'parent')
     if (f.path === currentFilePath) btn.classList.add('active')
-    btn.append(icon, label)
+    // The way back sits in the expander's column and its name takes the icon's,
+    // so the row reads left to right like every other one instead of hanging a
+    // column in. It has no icon of its own, which is why no slot is skipped.
+    if (f.kind === 'parent') btn.append(chevron, label)
+    else btn.append(chevron, icon, label)
     li.appendChild(btn)
     list.appendChild(li)
   }
@@ -1332,6 +1438,11 @@ async function init(): Promise<void> {
   fileListEl().addEventListener('click', async (e) => {
     const btn = (e.target as HTMLElement).closest('button[data-path]') as HTMLButtonElement | null
     if (!btn || !btn.dataset.path) return
+    // A directory expands in place; the tree only ever grows downward.
+    if (btn.dataset.kind === 'directory') {
+      togglePanelDirectory(btn.dataset.path)
+      return
+    }
     if (btn.dataset.path === currentFilePath) return
     // ⌘/Ctrl click opens the file in a tab of its own (design.md).
     if (btn.dataset.kind === 'file' && (e.metaKey || e.ctrlKey)) {
@@ -1355,6 +1466,9 @@ async function init(): Promise<void> {
   })
   initPanelResize()
   bindTabBar(api)
+  // The launch document (the welcome screen or a restored file) is a tab from
+  // the first frame, so the strip never renders without one.
+  ensureTab()
   renderTabBar()
   fileTabEl().addEventListener('click', () => setPanelMode('files'))
   outlineTabEl().addEventListener('click', () => setPanelMode('outline'))
@@ -1380,7 +1494,12 @@ async function init(): Promise<void> {
   // by sections passed along the way (review on #68).
   onEditorJumpPhase((phase) => (phase === 'start' ? beginOutlineJump() : endOutlineJump()))
 
-  api.onSiblingsChanged((files) => renderFileList(files))
+  api.onSiblingsChanged((files) => {
+    // A watcher refresh can change any directory that is open, so drop the
+    // cached levels and let the expanded ones read themselves again.
+    panelChildren.clear()
+    renderFileList(files)
+  })
   updatePanelVisibility()
   await refreshSiblings()
 
@@ -1396,26 +1515,19 @@ async function init(): Promise<void> {
   api.onMenuExportDOCX(() => { void api.exportDOCX(getContent()) })
   api.onMenuExportImage((preset) => { void exportCurrentImage(preset) })
 
-  api.onNewFile(() => { releaseMermaidRenderer(); exitSourceMode(); applyContent(''); scheduleOutlineUpdate() })
+  api.onNewFile(() => {
+    releaseMermaidRenderer()
+    exitSourceMode()
+    ensureTab()
+    applyContent('')
+    scheduleOutlineUpdate()
+    renderTabBar()
+  })
   api.onFileOpened((data) => {
     releaseMermaidRenderer()
-    // The window always opens with exactly one document; the bar for it appears
-    // only once the user creates a second tab.
-    if (tabs.length === 0) {
-      tabs.push({
-        id: `tab-${nextTabId++}`,
-        filePath: null,
-        dirty: false,
-        revision: documentRevision,
-        sourceMode: false,
-        sourceText: '',
-        content: '',
-        editorState: null,
-        diskContent: null,
-        scrollTop: 0
-      })
-      activeTabId = tabs[0].id
-    }
+    // A document opened into a window that has none yet (a launch with a file)
+    // lands in the first tab rather than creating a second one.
+    ensureTab()
     currentFilePath = data.path
     dirty = false
     const tab = activeTab()
