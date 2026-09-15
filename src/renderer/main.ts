@@ -187,9 +187,15 @@ function untitledLabel(): string {
   return untitledName
 }
 
+// The tab carries the document's name, not its file name. `.md` on every tab is
+// noise in a strip that hugs its label, and it lands right where the ellipsis
+// cuts — `解读.…` reads as four dots. Mirrors the panel's markdown filter.
+const DOCUMENT_SUFFIX = /\.(md|markdown|mdown|mkd)$/i
+
 function tabLabel(tab: DocumentTab): string {
   if (!tab.filePath) return untitledLabel()
-  return tab.filePath.split(/[\\/]/).pop() || tab.filePath
+  const name = tab.filePath.split(/[\\/]/).pop() || tab.filePath
+  return name.replace(DOCUMENT_SUFFIX, '')
 }
 
 // Read the live state back into the active tab's record. Called before every
