@@ -73,6 +73,23 @@ body {
   z-index: 30;
 }
 
+/* The clearance above belongs to the traffic lights. macOS hides them in full
+   screen and no other platform has them, so the strip starts on the window's own
+   left edge there instead of leaving 96px of empty chrome (2026-09-15). */
+body.fullscreen #titlebar,
+body.platform-non-mac #titlebar {
+  padding-left: 6px;
+}
+
+/* Windows paints its window controls inside this row (titleBarOverlay) instead of
+   in a title bar of its own, which is what turns three stacked bars into one row.
+   The controls are drawn over the web content, so the row keeps their width clear:
+   env() reports the area the OS left us, and the 138px fallback is the Windows 11
+   control cluster when the variable is unavailable. */
+body.platform-win #titlebar {
+  padding-right: calc(100vw - env(titlebar-area-width, calc(100vw - 138px)) + 6px);
+}
+
 /* The row's one baseline. It is its own element rather than an inset shadow
    because the active tab has to be able to cover it: the tab is opaque paper
    flush with the bottom of the row, so the line is cut where the tab opens into
@@ -87,18 +104,11 @@ body {
   background: var(--shell-line);
 }
 
-/* The panel's seam, carried up through the row so the column reads as a column
-   from the window's top edge. The row keeps its OWN surface on both sides of it:
-   the paper does not climb into the row. */
-body.show-file-panel #titlebar {
-  background: linear-gradient(
-    to right,
-    var(--chrome-bg) calc(100% - var(--panel-column)),
-    var(--shell-line) calc(100% - var(--panel-column)),
-    var(--shell-line) calc(100% - var(--panel-column) + 1px),
-    var(--chrome-bg) calc(100% - var(--panel-column) + 1px)
-  );
-}
+/* The panel's column is a column below the row, and only below it: the row keeps
+   its own surface across the full width. Carrying the seam up through the row
+   (2.4.0) put a vertical line in the chrome at the row's right end, which read as
+   a stray mark rather than as an edge — there is no surface change up there to
+   justify a line (2026-09-15). */
 
 #save-status {
   /* A flex member of the row, left of the button cluster. The free space in the
@@ -234,6 +244,12 @@ body.show-file-panel #titlebar {
 .tab-entry-name {
   flex: 1 1 auto;
   min-width: 0;
+  /* The label's box has to be TALLER than its glyphs, not exactly as tall. With
+     line-height 1 the ink filled the box edge to edge, and a CJK font with a
+     roomier em box (Windows) had the bottom of its strokes cut off by the
+     overflow clip below. 20px inside the 40px tab leaves 2px of air each side on
+     every platform's font (2026-09-15). */
+  line-height: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -339,6 +355,29 @@ body.show-file-panel #titlebar {
   align-items: center;
   justify-content: center;
   -webkit-app-region: no-drag;
+}
+
+/* `display: flex` above outranks the UA rule for [hidden], so the attribute has
+   to be honoured explicitly: the menu button only exists on Windows, and an
+   invisible-looking 28px box would still sit in the row and push the others. */
+#titlebar > button[hidden] {
+  display: none;
+}
+
+/* One focus ring for the whole shell, drawn in the theme's own ink. The platform
+   default follows the SYSTEM accent colour, so a keyboard focus inside a
+   monochrome row came out orange on macOS (2026-09-15) and would come out a
+   different colour on every machine, in neither case the theme's. Colour accents
+   belong to the document; the shell reports focus with weight and shape. */
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--text-color) 40%, transparent);
+  outline-offset: 1px;
+}
+
+/* The close button sits INSIDE its tab, so its ring has to grow inward: an
+   outward one would paint over the neighbouring tab's edge. */
+.tab-entry-close:focus-visible {
+  outline-offset: -2px;
 }
 
 /* The tooltip reveal is its own rule, apart from anything that changes colour:

@@ -28,6 +28,14 @@ function writeStartupTrace(): void {
 const themesDir = join(app.getPath('home'), '.colamd', 'themes')
 const releaseNoticePath = join(app.getPath('userData'), 'release-notice.json')
 
+// The shell's top row, in CSS pixels: the window controls overlay on Windows has
+// to be told the same height the renderer draws (design.md, one row).
+const TITLEBAR_HEIGHT = 40
+// What the overlay shows before the renderer reports its theme: the default
+// theme's chrome surface and ink. The renderer corrects it on first paint.
+const DEFAULT_OVERLAY_BG = '#e4e1de'
+const DEFAULT_OVERLAY_SYMBOL = '#3a342e'
+
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown', '.mdown', '.mkd']
 
 // Bundled examples are opened on demand from Help. Browsing the user's
@@ -326,12 +334,26 @@ function notifyExternalChange(win: BrowserWindow, filePath: string): void {
 }
 
 function createWindow(filePath?: string, initialContent?: string, initialBrowsePath?: string): BrowserWindow {
+  // Windows gets ONE row for its shell. A normal Windows frame stacks three
+  // bars: the system title bar, the in-window menu bar, and our own 40px row,
+  // which is what made the app read as heavy there (2026-09-15). So: no system
+  // title bar, no menu bar, and the OS draws the window controls as an overlay
+  // inside our row instead (Chrome's arrangement). macOS keeps its traffic
+  // lights inside the same row, and Linux keeps its frame and its menu bar.
+  const isWindows = process.platform === 'win32'
   const win = new BrowserWindow({
     ...(usableBounds() ?? { width: 960, height: 720 }),
     minWidth: 600,
     minHeight: 400,
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: isWindows ? 'hidden' : 'hiddenInset',
+    ...(isWindows
+      ? { titleBarOverlay: { color: DEFAULT_OVERLAY_BG, symbolColor: DEFAULT_OVERLAY_SYMBOL, height: TITLEBAR_HEIGHT } }
+      : {}),
     trafficLightPosition: { x: 16, y: 14 },
+    // Windows only: the menu bar is the second of the three bars, so it starts
+    // hidden and Alt still reveals it the way Windows users expect. The row gets
+    // its own menu button, which pops the same menu.
+    ...(isWindows ? { autoHideMenuBar: true } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -342,6 +364,15 @@ function createWindow(filePath?: string, initialContent?: string, initialBrowseP
     }
   })
   markStartup('window-created')
+
+  // The renderer owns the shell's layout, so it needs to know when the window
+  // enters or leaves macOS full screen: full screen takes the traffic lights
+  // away, and the 96px they occupy has to go with them.
+  const sendFullscreen = (isFullscreen: boolean): void => {
+    if (!win.isDestroyed()) win.webContents.send('fullscreen-changed', isFullscreen)
+  }
+  win.on('enter-full-screen', () => sendFullscreen(true))
+  win.on('leave-full-screen', () => sendFullscreen(false))
 
   const state = getState(win)
   if (initialBrowsePath) state.browsePath = initialBrowsePath
@@ -1438,6 +1469,33 @@ ipcMain.handle('report-theme', (_event, theme: unknown) => {
   updateThemeMenuChecks()
 })
 
+// The Windows window controls are painted by the OS inside our own row, so their
+// strip has to carry the theme's chrome colour. The renderer resolves the live
+// computed colours and reports them on every theme change; the overlay only
+// exists on Windows, and older runtimes without the API simply keep the default.
+ipcMain.handle('report-titlebar-colors', (event, colors: unknown) => {
+  if (process.platform !== 'win32') return
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win || win.isDestroyed()) return
+  const payload = colors as { background?: unknown; symbol?: unknown } | null
+  const background = typeof payload?.background === 'string' ? payload.background : ''
+  if (!background) return
+  const symbol = typeof payload?.symbol === 'string' && payload.symbol ? payload.symbol : undefined
+  try {
+    win.setTitleBarOverlay({ color: background, ...(symbol ? { symbolColor: symbol } : {}), height: TITLEBAR_HEIGHT })
+  } catch {
+    /* the window was not created with an overlay: nothing to update */
+  }
+})
+
+// The row's own menu button (Windows, where the menu bar is hidden). It pops the
+// application menu in place, so the menu stays the same native menu everywhere.
+ipcMain.handle('popup-app-menu', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win || win.isDestroyed()) return
+  Menu.getApplicationMenu()?.popup({ window: win })
+})
+
 ipcMain.handle('get-language', () => getPreferredLanguage())
 
 // Menu — targets the focused window
@@ -1544,7 +1602,7 @@ function buildMenu(): void {
   const preferredCheatsheetLanguage = getPreferredCheatsheetLanguage()
   const labels = preferredCheatsheetLanguage === 'zh'
     ? {
-        file: '文件', edit: '编辑', view: '视图', theme: '主题', help: '帮助',
+        file: '文件', edit: '编辑', view: '视图', theme: '主题', window: '窗口', help: '帮助',
         newFile: '新建', open: '打开...', save: '保存', saveAs: '另存为...',
         newTab: '新建标签页', closeTab: '关闭标签页',
         recentOpen: '最近打开', restoreOnLaunch: '启动时打开上次文档', clearRecent: '清除最近记录', noRecent: '没有最近打开的文件',
@@ -1561,9 +1619,10 @@ function buildMenu(): void {
         fontSettings: '编辑器字体…',
         language: '界面语言', chinese: '中文', english: 'English',
         hide: '隐藏 ColaMD', hideOthers: '隐藏其他应用', showAll: '显示全部', quit: '退出 ColaMD',
+        minimize: '最小化', zoom: '缩放', front: '前置全部窗口',
       }
     : {
-        file: 'File', edit: 'Edit', view: 'View', theme: 'Theme', help: 'Help',
+        file: 'File', edit: 'Edit', view: 'View', theme: 'Theme', window: 'Window', help: 'Help',
         newFile: 'New', open: 'Open...', save: 'Save', saveAs: 'Save As...',
         newTab: 'New Tab', closeTab: 'Close Tab',
         recentOpen: 'Open Recent', restoreOnLaunch: 'Reopen last document at launch', clearRecent: 'Clear Recent', noRecent: 'No recent files',
@@ -1580,6 +1639,7 @@ function buildMenu(): void {
         fontSettings: 'Editor Font…',
         language: 'Language', chinese: '中文', english: 'English',
         hide: 'Hide ColaMD', hideOthers: 'Hide Others', showAll: 'Show All', quit: 'Quit ColaMD',
+        minimize: 'Minimize', zoom: 'Zoom', front: 'Bring All to Front',
       }
 
   const themeIdByLabel = new Map<string, string>([
@@ -1792,8 +1852,10 @@ function buildMenu(): void {
     // commands (System Settings → Keyboard → Keyboard Shortcuts → Windows, e.g.
     // ⌃⌥⌘←) into whichever menu is registered via setWindowsMenu. Electron does
     // that only for role 'windowMenu' — without it every tiling shortcut is
-    // dead in the app (#97).
-    ...(isMac ? [{ role: 'windowMenu' as const }] : []),
+    // dead in the app (#97). The role supplies the items; the label is ours, so
+    // the menu speaks the interface language like every other one (an English
+    // "Window" sat between 主题 and 帮助 until 2026-09-15).
+    ...(isMac ? [{ role: 'windowMenu' as const, label: labels.window }] : []),
     {
       label: labels.help,
       submenu: [
@@ -1827,10 +1889,31 @@ function buildMenu(): void {
 
   const menu = Menu.buildFromTemplate(template)
   Menu.setApplicationMenu(menu)
+  localizeWindowMenu(menu, labels)
   themeMenuItems = [
     ...themeSubmenu.filter((item): item is Electron.MenuItemConstructorOptions & { id: string } => typeof item.id === 'string')
       .map((item) => ({ id: item.id, theme: themeIdByLabel.get(item.label ?? '') ?? (item.id.startsWith('theme-custom-') ? `custom:${String(item.label)}.css` : '') })),
   ]
+}
+
+// The Window menu's three standard items come from the 'windowMenu' role, and
+// Electron leaves their labels to the system language. In an app whose interface
+// is Chinese on an English system that left "Minimize / Zoom / Bring All to
+// Front" sitting in an otherwise Chinese menu (2026-09-15), so the labels are
+// rewritten to the interface language. The role stays: it is what registers the
+// menu with macOS and keeps the system window-tiling shortcuts alive (#97).
+function localizeWindowMenu(menu: Menu, labels: { minimize: string; zoom: string; front: string }): void {
+  const windowMenu = menu.items.find((item) => item.role === 'windowmenu')
+  if (!windowMenu?.submenu) return
+  const byRole: Record<string, string> = {
+    minimize: labels.minimize,
+    zoom: labels.zoom,
+    front: labels.front
+  }
+  for (const item of windowMenu.submenu.items) {
+    const label = item.role ? byRole[item.role] : undefined
+    if (label) item.label = label
+  }
 }
 
 function updateThemeMenuChecks(): void {
@@ -2045,6 +2128,10 @@ ipcMain.on('renderer-ready', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (win) {
     getState(win).rendererReady = true
+    // The renderer is listening now, so it can be told the state it cannot read
+    // for itself: a window restored into full screen must not keep the traffic
+    // light clearance.
+    win.webContents.send('fullscreen-changed', win.isFullScreen())
     // Files queued before the renderer could listen (multi-file launch, early
     // second-instance) go out now.
     flushPendingTabFiles(win)

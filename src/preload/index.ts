@@ -50,6 +50,9 @@ export interface ElectronAPI {
   loadCustomTheme: () => Promise<{ name: string; css: string } | null>
   loadThemeCSS: (fileName: string) => Promise<string | null>
   reportTheme: (theme: string) => Promise<void>
+  reportTitlebarColors: (colors: { background: string; symbol: string }) => Promise<void>
+  popupAppMenu: () => Promise<void>
+  onFullscreenChange: (callback: (isFullscreen: boolean) => void) => void
   getPathForFile: (file: File) => string
   openExternal: (url: string) => void
   onFileChanged: (callback: (content: string) => void) => void
@@ -128,6 +131,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadCustomTheme: () => ipcRenderer.invoke('load-custom-theme'),
   loadThemeCSS: (fileName: string) => ipcRenderer.invoke('load-theme-css', fileName),
   reportTheme: (theme: string) => ipcRenderer.invoke('report-theme', theme),
+  reportTitlebarColors: (colors: { background: string; symbol: string }) => ipcRenderer.invoke('report-titlebar-colors', colors),
+  popupAppMenu: () => ipcRenderer.invoke('popup-app-menu'),
+  onFullscreenChange: (callback: (isFullscreen: boolean) => void) => {
+    ipcRenderer.on('fullscreen-changed', (_event, isFullscreen) => callback(isFullscreen === true))
+  },
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
   onFileChanged: (callback: (content: string) => void) => {

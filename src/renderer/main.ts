@@ -1,4 +1,4 @@
-import { createEditor, flashHeadingOnArrival, getMarkdown, onEditorJumpPhase, setMarkdown, showMathModal, setMathModalLanguage, releaseMermaidRenderer, getEditorState, restoreEditorState, applyMarkdownStyle, runFormatCommand, type FormatCommandId } from './editor/editor'
+import { createEditor, flashHeadingOnArrival, focusEditor, getMarkdown, onEditorJumpPhase, setMarkdown, showMathModal, setMathModalLanguage, releaseMermaidRenderer, getEditorState, restoreEditorState, applyMarkdownStyle, runFormatCommand, type FormatCommandId } from './editor/editor'
 import { detectMarkdownStyle } from './editor/markdown-style'
 import { SearchPanel } from './editor/search-panel'
 import { applyTheme, loadSavedTheme } from './themes/theme-manager'
@@ -460,6 +460,8 @@ async function openNewTab(): Promise<void> {
   await window.electronAPI.activateFile(null)
   showBlankDocument()
   renderTabBar()
+  // The new tab exists to be typed in, so the caret goes there without a click.
+  focusEditor()
 }
 
 async function activateTab(id: string): Promise<void> {
@@ -1411,6 +1413,14 @@ async function init(): Promise<void> {
   // space, never in the way). The thin custom scrollbar is only for Windows and
   // Linux, where the platform default is a chunky always-on bar.
   if (!/^Mac/i.test(navigator.platform)) document.body.classList.add('platform-non-mac')
+  // Windows has no traffic lights on the left and draws its window controls inside
+  // the row on the right (titleBarOverlay), so it needs both ends of the row told
+  // apart from macOS. The menu button shows there too, since the menu bar is
+  // hidden (the Alt key still reveals the system one).
+  if (/Windows/i.test(navigator.userAgent)) {
+    document.body.classList.add('platform-win')
+    document.getElementById('app-menu-btn')?.removeAttribute('hidden')
+  }
   const language = await api.getLanguage()
   fileManagerName = await api.getFileManagerName()
   setUiLanguage(language)
@@ -1599,6 +1609,18 @@ async function init(): Promise<void> {
   })
 
   api.onSetTheme((theme) => applyTheme(theme))
+
+  // macOS takes the traffic lights away in full screen, so the row drops the 96px
+  // they sit in. The main process owns the window state and reports it here, both
+  // on the transitions and once at startup for a window restored into full screen.
+  api.onFullscreenChange((isFullscreen) => {
+    document.body.classList.toggle('fullscreen', isFullscreen)
+  })
+
+  // The row's own menu button. Windows hides the menu bar (autoHideMenuBar) so the
+  // shell is one row; this button pops the same native menu, which keeps the menu
+  // itself identical on every platform.
+  document.getElementById('app-menu-btn')?.addEventListener('click', () => void api.popupAppMenu())
   api.onLanguageChanged((language: UiLanguage) => {
     setUiLanguage(language)
     searchPanel.setLanguage(language)

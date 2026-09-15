@@ -44,6 +44,17 @@ export function applyTheme(name: string, customCSS?: string): void {
 
   // Tell the main process so the theme menu can show the selected state
   window.electronAPI?.reportTheme?.(name)
+
+  // …and hand it the resolved shell colours. Windows paints the window controls
+  // inside our own row (titleBarOverlay), and that overlay has to be told a real
+  // colour: the chrome surface and the row's ink, read off the live computed
+  // style so a custom theme works the same as a built-in one.
+  const bar = document.getElementById('titlebar')
+  if (bar) {
+    const surface = getComputedStyle(bar).backgroundColor
+    const ink = getComputedStyle(document.body).color
+    window.electronAPI?.reportTitlebarColors?.({ background: surface, symbol: ink })
+  }
 }
 
 export function loadSavedTheme(): string {

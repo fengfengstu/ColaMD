@@ -809,6 +809,14 @@ export function getEditorView(): EditorView | null {
   return view
 }
 
+// Put the caret in the document without touching its content. A brand-new tab
+// arrives empty and has to be ready to type in: the plus button (or ⌘T) is a
+// request to write, and having to click the page first was one keystroke of
+// friction on every new document (2026-09-15).
+export function focusEditor(): void {
+  getEditorView()?.focus()
+}
+
 // Per-tab documents share one editor instance. The ProseMirror state carries the
 // document, the selection and the undo stack, so capturing it per tab is what
 // keeps each tab's own undo history instead of one shared stack.
