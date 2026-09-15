@@ -254,9 +254,8 @@ body {
   background: color-mix(in srgb, var(--text-color) 12%, var(--bg-color));
 }
 
-/* The strip clips its own overflow, so the shortcut hint lives in a fixed layer
-   and is positioned by the renderer instead of being a child of the tab. */
-#tab-tip {
+/* One floating label, used by the strip and by the file panel. */
+#hover-tip {
   position: fixed;
   padding: 4px 8px;
   border-radius: 5px;
@@ -269,22 +268,12 @@ body {
   z-index: 60;
 }
 
-#tab-tip[hidden] {
+#hover-tip[hidden] {
   display: none;
 }
 
-#file-toggle-btn:hover {
-  background: color-mix(in srgb, var(--text-color) 14%, transparent);
-  color: var(--text-color);
-}
-
 #file-toggle-btn.active {
-  background: color-mix(in srgb, var(--text-color) 14%, transparent);
   color: var(--text-color);
-}
-
-#file-toggle-btn.active:hover {
-  background: color-mix(in srgb, var(--text-color) 20%, transparent);
 }
 
 /* A wide, invisible hit area bridging the gap to the title, so the pointer
@@ -294,42 +283,39 @@ body {
    appearing out there is noise (design.md). The button stays hit-testable while
    hidden, otherwise it could never be reached or clicked. */
 /* Source (Markdown) / WYSIWYG toggle */
-#source-toggle-btn:hover {
-  background: color-mix(in srgb, var(--text-color) 14%, transparent);
-  color: var(--text-color);
-}
-
 #source-toggle-btn.active {
-  background: color-mix(in srgb, var(--text-color) 14%, transparent);
   color: var(--text-color);
 }
 
 #source-toggle-btn.disabled {
-  opacity: 0.45;
+  color: color-mix(in srgb, var(--text-muted) 35%, transparent);
   cursor: default;
 }
 
 #source-toggle-btn.disabled:hover {
-  background: transparent;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 35%, transparent);
 }
 
 /* The three titlebar buttons share ONE box rule: same size, same radius, same
    colours. Duplicating the box per button is how the word-count button lost
-   its border-radius while the other two kept theirs. */
+   its border-radius while the other two kept theirs.
+   They report themselves by WEIGHT, never by a box: a chip that appears under
+   the pointer and vanishes again pulls the eye out of the document, so the
+   icon just gains contrast on hover and the on-state is the strongest reading
+   in the row. */
 #titlebar > button {
   width: 28px;
   height: 28px;
   border-radius: 6px;
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 55%, transparent);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-app-region: no-drag;
-  transition: background 0.15s, color 0.15s;
+  transition: color 0.15s;
 }
 
 /* Top-right controls. The icon hover tint and the tooltip positioning are
@@ -339,7 +325,14 @@ body {
 #word-count:hover,
 #source-toggle-btn:hover,
 #file-toggle-btn:hover {
-  background: color-mix(in srgb, var(--text-color) 14%, transparent);
+  color: color-mix(in srgb, var(--text-color) 80%, transparent);
+}
+
+/* "On" — the file panel is showing, or the document is in source mode. */
+#file-toggle-btn.active,
+#source-toggle-btn.active,
+#source-toggle-btn.active:hover,
+#file-toggle-btn.active:hover {
   color: var(--text-color);
 }
 
@@ -459,8 +452,12 @@ body.panel-resizing {
   gap: 0;
   margin: 0 0 8px;
   padding: 2px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
+  /* One rectangle, not two: the tray carries a surface and nothing else, and
+     its 4px corners are the tabs' corners. The active chip then wears the
+     tabs' exact recipe — paper plus the same 1px hairline — so the sidebar and
+     the strip say "chosen" the same way. */
+  border: none;
+  border-radius: 4px;
   /* The tray is the theme's raised chrome surface, not a hardcoded grey: a
      hardcoded tint sits at the same luminance as the paper chip in dark themes
      and the active state dissolves (2026-09-15). With --chrome-bg the chip
@@ -469,8 +466,11 @@ body.panel-resizing {
 }
 
 .file-panel-tabs button {
-  min-height: 26px;
-  border: none;
+  /* 30px: the same height as a tab, so the two controls are one size. */
+  min-height: 30px;
+  /* Transparent, not absent: the active chip adds the hairline, and a border
+     that appears only when chosen would shift the label by a pixel. */
+  border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
   color: var(--text-muted);
@@ -599,27 +599,14 @@ body.panel-resizing {
   background: transparent;
 }
 
-#file-list button:hover .file-entry-name.scrolling {
-  text-overflow: clip;
-  animation: file-entry-scroll var(--file-entry-scroll-duration) ease-in-out 500ms infinite alternate;
-}
-
-@keyframes file-entry-scroll {
-  to {
-    transform: translateX(calc(-1 * var(--file-entry-scroll)));
-  }
-}
+/* Names are shortened with an ellipsis and spelled out in the hover label;
+   they are never scrolled, which covers the row it belongs to. */
 
 #file-list button:hover,
 #outline-list button:hover {
   background: color-mix(in srgb, var(--text-color) 14%, transparent);
 }
 
-/* Active entry in both lists: a NEUTRAL raised surface, not an accent colour.
-   The reading position is location, not importance, so it gets the same quiet
-   lifted chip in every theme (--chrome-bg-hover derives from the theme, stays
-   visible on dark and light); colour accents belong to the document, not the
-   shell. The old hardcoded orange (#F1752D) ignored themes entirely. */
 #file-list .file-empty {
   padding: 4px 8px;
   color: var(--text-muted);
@@ -627,6 +614,11 @@ body.panel-resizing {
   font-style: italic;
 }
 
+/* Active entry in both lists: a NEUTRAL raised surface, not an accent colour.
+   The reading position is location, not importance, so it gets the same quiet
+   lifted chip in every theme (--chrome-bg-hover derives from the theme, stays
+   visible on dark and light); colour accents belong to the document, not the
+   shell. The old hardcoded orange (#F1752D) ignored themes entirely. */
 #file-list button.active,
 #outline-list button.active {
   background: var(--chrome-bg-hover);

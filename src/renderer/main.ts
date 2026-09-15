@@ -222,29 +222,46 @@ function markActiveTabDirty(): void {
   entry?.classList.toggle('dirty', dirty)
 }
 
-// The tab hint waits before it appears: hovering a tab is usually a prelude to
-// clicking it, and a label that jumps out immediately is noise.
+// --- The floating label ---
+// ONE fixed layer for every name the shell has to shorten: a tab (where it also
+// carries ⌘W) and a file-panel row. Neither the strip nor the panel can host it
+// — both clip their own overflow — so the renderer positions it.
+// A tab waits longer: hovering a tab is usually a prelude to clicking it, and a
+// label that jumps out immediately is noise. A row is different — the name is
+// what was asked for, so it answers sooner.
 const TAB_TIP_DELAY = 1000
+const ROW_TIP_DELAY = 450
 
-let tabTipTimer: ReturnType<typeof setTimeout> | undefined
+let tipTimer: ReturnType<typeof setTimeout> | undefined
 
-// The strip clips its own overflow, so the shortcut hint is a fixed layer that
-// the renderer positions under the tab on hover.
-function showTabTip(button: HTMLElement, text: string): void {
-  const tip = document.getElementById('tab-tip') as HTMLElement | null
+function showTip(anchor: HTMLElement, text: string, side: 'below' | 'right'): void {
+  const tip = document.getElementById('hover-tip') as HTMLElement | null
   if (!tip) return
   tip.textContent = text
   tip.hidden = false
-  const rect = button.getBoundingClientRect()
+  const rect = anchor.getBoundingClientRect()
   const width = tip.offsetWidth
-  const left = Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8)
-  tip.style.left = `${Math.round(left)}px`
+  if (side === 'right') {
+    // Beside the panel and level with the row: the label describes the list, so
+    // it must not cover it.
+    const height = tip.offsetHeight
+    tip.style.left = `${Math.round(Math.min(rect.right + 8, window.innerWidth - width - 8))}px`
+    tip.style.top = `${Math.round(Math.min(Math.max(8, rect.top + rect.height / 2 - height / 2), window.innerHeight - height - 8))}px`
+    return
+  }
+  tip.style.left = `${Math.round(Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8))}px`
   tip.style.top = `${Math.round(rect.bottom + 7)}px`
 }
 
-function scheduleTabTip(button: HTMLElement, text: string): void {
-  clearTimeout(tabTipTimer)
-  tabTipTimer = setTimeout(() => showTabTip(button, text), TAB_TIP_DELAY)
+function scheduleTip(anchor: HTMLElement, text: string, side: 'below' | 'right', delay: number): void {
+  clearTimeout(tipTimer)
+  tipTimer = setTimeout(() => showTip(anchor, text, side), delay)
+}
+
+function hideTip(): void {
+  clearTimeout(tipTimer)
+  const tip = document.getElementById('hover-tip') as HTMLElement | null
+  if (tip) tip.hidden = true
 }
 
 // A tab whose name fits says nothing but the shortcut; only a truncated name is
@@ -259,9 +276,7 @@ function tabTipText(entry: HTMLElement): string {
 }
 
 function hideTabTip(): void {
-  clearTimeout(tabTipTimer)
-  const tip = document.getElementById('tab-tip') as HTMLElement | null
-  if (tip) tip.hidden = true
+  hideTip()
 }
 function closeGlyph(): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -608,8 +623,8 @@ function bindTabBar(api: import('../preload/index').ElectronAPI): void {
     lastHoverPoint = point
     const target = e.target as HTMLElement
     const entry = target.closest('.tab-entry') as HTMLElement | null
-    if (entry) scheduleTabTip(entry, tabTipText(entry))
-    else if (target.closest('.tab-new-btn')) scheduleTabTip(target.closest('.tab-new-btn') as HTMLElement, isChinese() ? '新建标签页 · ⌘T' : 'New tab · ⌘T')
+    if (entry) scheduleTip(entry, tabTipText(entry), 'below', TAB_TIP_DELAY)
+    else if (target.closest('.tab-new-btn')) scheduleTip(target.closest('.tab-new-btn') as HTMLElement, isChinese() ? '新建标签页 · ⌘T' : 'New tab · ⌘T', 'below', TAB_TIP_DELAY)
     else hideTabTip()
   })
   tabBarEl().addEventListener('mouseleave', () => {
@@ -1201,6 +1216,7 @@ function togglePanelDirectory(dir: string): void {
 
 function renderFileList(files: import('../preload/index').SiblingFile[]): void {
   panelRoot = files
+  hideTip()
   const list = fileListEl()
   list.innerHTML = ''
   for (const row of panelRows()) {
@@ -1233,17 +1249,13 @@ function renderFileList(files: import('../preload/index').SiblingFile[]): void {
     label.className = 'file-entry-name'
     label.textContent = f.kind === 'parent' ? '..' : f.name
     btn.addEventListener('mouseenter', () => {
-      const overflow = label.scrollWidth - label.clientWidth
-      if (overflow <= 0) return
-      label.style.setProperty('--file-entry-scroll', `${overflow}px`)
-      label.style.setProperty('--file-entry-scroll-duration', `${Math.min(6, Math.max(2.4, overflow / 20))}s`)
-      label.classList.add('scrolling')
+      // Only a name that is actually cut off is worth a label; one that fits
+      // says itself. No marquee: sliding the name under the icon to read it
+      // covers the row it belongs to.
+      if (label.scrollWidth <= label.clientWidth + 1) return
+      scheduleTip(btn, label.textContent ?? '', 'right', ROW_TIP_DELAY)
     })
-    btn.addEventListener('mouseleave', () => {
-      label.classList.remove('scrolling')
-      label.style.removeProperty('--file-entry-scroll')
-      label.style.removeProperty('--file-entry-scroll-duration')
-    })
+    btn.addEventListener('mouseleave', hideTip)
     btn.title = f.kind === 'directory'
       ? (isChinese()
           ? `${row.expanded ? '收起' : '展开'} ${f.name}`
