@@ -1115,12 +1115,90 @@ function updateFileTitle(): void {
   document.title = name
 }
 
+// --- File panel: one root, expanded downward ---
+// The root is the open document's directory and `..` stays the one way back
+// up; a directory is read only when it is expanded, so a deep tree costs
+// nothing until the reader asks for it. Expansion lives in memory only — no
+// workspace, nothing restored on the next launch.
+const PANEL_INDENT = 12
+let panelRoot: import('../preload/index').SiblingFile[] = []
+const panelChildren = new Map<string, import('../preload/index').SiblingFile[]>()
+const panelExpanded = new Set<string>()
+const panelLoading = new Set<string>()
+
+type PanelRow = {
+  file: import('../preload/index').SiblingFile
+  depth: number
+  expandable: boolean
+  expanded: boolean
+  empty: boolean
+}
+
+// Flatten the expanded tree into visible rows. Rendering stays a flat list, so
+// hover, active state and hit-testing keep working the way they always have.
+function panelRows(): PanelRow[] {
+  const rows: PanelRow[] = []
+  const walk = (entries: import('../preload/index').SiblingFile[], depth: number): void => {
+    for (const file of entries) {
+      const expanded = file.kind === 'directory' && panelExpanded.has(file.path)
+      rows.push({ file, depth, expandable: file.kind === 'directory', expanded, empty: false })
+      if (!expanded) continue
+      const children = panelChildren.get(file.path)
+      if (!children) {
+        void loadPanelDirectory(file.path)
+        continue
+      }
+      if (children.length === 0) rows.push({ file, depth: depth + 1, expandable: false, expanded: false, empty: true })
+      else walk(children, depth + 1)
+    }
+  }
+  walk(panelRoot, 0)
+  return rows
+}
+
+function loadPanelDirectory(dir: string): void {
+  if (panelLoading.has(dir)) return
+  panelLoading.add(dir)
+  void window.electronAPI.listDirectory(dir).then((children) => {
+    panelLoading.delete(dir)
+    if (!children) return
+    panelChildren.set(dir, children)
+    renderFileList(panelRoot)
+  })
+}
+
+function togglePanelDirectory(dir: string): void {
+  if (panelExpanded.has(dir)) panelExpanded.delete(dir)
+  else {
+    panelExpanded.add(dir)
+    loadPanelDirectory(dir)
+  }
+  renderFileList(panelRoot)
+}
+
 function renderFileList(files: import('../preload/index').SiblingFile[]): void {
+  panelRoot = files
   const list = fileListEl()
   list.innerHTML = ''
-  for (const f of files) {
+  for (const row of panelRows()) {
     const li = document.createElement('li')
+    const indent = 8 + row.depth * PANEL_INDENT
+    if (row.empty) {
+      const empty = document.createElement('div')
+      empty.className = 'file-empty'
+      empty.style.paddingLeft = `${indent}px`
+      empty.textContent = isChinese() ? '这个文件夹是空的' : 'This folder is empty'
+      li.appendChild(empty)
+      list.appendChild(li)
+      continue
+    }
+    const f = row.file
     const btn = document.createElement('button')
+    btn.style.paddingLeft = `${indent}px`
+    const chevron = document.createElement('span')
+    chevron.className = `file-entry-chevron${row.expanded ? ' expanded' : ''}`
+    chevron.setAttribute('aria-hidden', 'true')
+    if (row.expandable) chevron.innerHTML = '<svg viewBox="0 0 10 10"><path d="M3.5 1.5 7 5l-3.5 3.5"/></svg>'
     const icon = document.createElement('span')
     icon.className = `file-entry-icon ${f.kind}`
     icon.setAttribute('aria-hidden', 'true')
@@ -1145,14 +1223,16 @@ function renderFileList(files: import('../preload/index').SiblingFile[]): void {
       label.style.removeProperty('--file-entry-scroll-duration')
     })
     btn.title = f.kind === 'directory'
-      ? (isChinese() ? `打开 ${f.name}` : `Open ${f.name}`)
+      ? (isChinese()
+          ? `${row.expanded ? '收起' : '展开'} ${f.name}`
+          : `${row.expanded ? 'Collapse' : 'Expand'} ${f.name}`)
       : f.kind === 'parent' ? (isChinese() ? '返回上级目录' : 'Go to parent directory') : f.name
     btn.dataset.path = f.path
     btn.dataset.kind = f.kind
     btn.classList.toggle('directory', f.kind === 'directory')
     btn.classList.toggle('parent', f.kind === 'parent')
     if (f.path === currentFilePath) btn.classList.add('active')
-    btn.append(icon, label)
+    btn.append(chevron, icon, label)
     li.appendChild(btn)
     list.appendChild(li)
   }
@@ -1332,6 +1412,11 @@ async function init(): Promise<void> {
   fileListEl().addEventListener('click', async (e) => {
     const btn = (e.target as HTMLElement).closest('button[data-path]') as HTMLButtonElement | null
     if (!btn || !btn.dataset.path) return
+    // A directory expands in place; the tree only ever grows downward.
+    if (btn.dataset.kind === 'directory') {
+      togglePanelDirectory(btn.dataset.path)
+      return
+    }
     if (btn.dataset.path === currentFilePath) return
     // ⌘/Ctrl click opens the file in a tab of its own (design.md).
     if (btn.dataset.kind === 'file' && (e.metaKey || e.ctrlKey)) {
@@ -1380,7 +1465,12 @@ async function init(): Promise<void> {
   // by sections passed along the way (review on #68).
   onEditorJumpPhase((phase) => (phase === 'start' ? beginOutlineJump() : endOutlineJump()))
 
-  api.onSiblingsChanged((files) => renderFileList(files))
+  api.onSiblingsChanged((files) => {
+    // A watcher refresh can change any directory that is open, so drop the
+    // cached levels and let the expanded ones read themselves again.
+    panelChildren.clear()
+    renderFileList(files)
+  })
   updatePanelVisibility()
   await refreshSiblings()
 

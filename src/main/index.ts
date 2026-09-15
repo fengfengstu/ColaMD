@@ -46,33 +46,34 @@ interface SiblingFile {
   kind: 'file' | 'directory' | 'parent'
 }
 
-// Browse Markdown files in the current directory. Directories are kept as
-// navigable entries rather than flattening the whole tree into one list.
-async function listSiblingFiles(filePath: string | null, browseDir?: string): Promise<SiblingFile[]> {
-  const dir = browseDir ?? (filePath ? dirname(filePath) : null)
-  if (!dir) return []
+// One directory level: subdirectories first, then Markdown files, each sorted
+// by name. Hidden directories stay out of the list.
+async function listDirectoryChildren(dir: string): Promise<SiblingFile[]> {
   try {
     const entries = await readdir(dir, { withFileTypes: true })
-    const result: SiblingFile[] = []
-    const parent = dirname(dir)
-    if (parent !== dir) result.push({ name: '..', path: parent, kind: 'parent' })
-
-    result.push(
-      ...entries
-        .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
-        .map((e) => ({ name: e.name, path: join(dir, e.name), kind: 'directory' as const }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-    )
-    result.push(
-      ...entries
-        .filter((e) => e.isFile() && MARKDOWN_EXTENSIONS.includes(extname(e.name).toLowerCase()))
-        .map((e) => ({ name: e.name, path: join(dir, e.name), kind: 'file' as const }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-    )
-    return result
+    const directories = entries
+      .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+      .map((e) => ({ name: e.name, path: join(dir, e.name), kind: 'directory' as const }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    const files = entries
+      .filter((e) => e.isFile() && MARKDOWN_EXTENSIONS.includes(extname(e.name).toLowerCase()))
+      .map((e) => ({ name: e.name, path: join(dir, e.name), kind: 'file' as const }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    return [...directories, ...files]
   } catch {
     return []
   }
+}
+
+// The file panel's root: the open document's directory, with `..` as the one
+// way back up. Deeper levels are read one directory at a time as the tree is
+// expanded, so nothing walks the whole tree up front.
+async function listSiblingFiles(filePath: string | null, browseDir?: string): Promise<SiblingFile[]> {
+  const dir = browseDir ?? (filePath ? dirname(filePath) : null)
+  if (!dir) return []
+  const parent = dirname(dir)
+  const children = await listDirectoryChildren(dir)
+  return parent === dir ? children : [{ name: '..', path: parent, kind: 'parent' }, ...children]
 }
 
 function ensureThemesDir(): void {
@@ -970,7 +971,13 @@ ipcMain.handle('list-siblings', async (event) => {
   return listSiblingFiles(state.filePath, state.browsePath ?? undefined)
 })
 
-// Open a Markdown file or navigate into a directory from the file panel.
+// Expanding a directory in the file panel reads that one directory.
+ipcMain.handle('list-directory', async (_event, dirPath: unknown) => {
+  if (typeof dirPath !== 'string' || !dirPath) return null
+  return listDirectoryChildren(dirPath)
+})
+
+// Open a Markdown file, or walk the panel's root back up, from the file panel.
 ipcMain.handle('open-sibling', async (event, filePath: string) => {
   const win = getWinFromEvent(event)
   if (!win || typeof filePath !== 'string') return false

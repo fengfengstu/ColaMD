@@ -513,6 +513,34 @@ body.panel-resizing {
   overflow: hidden;
 }
 
+/* Chevron slot: reserved for files too, so names line up along one column at
+   every depth. Expanded levels point down. */
+.file-entry-chevron {
+  display: inline-flex;
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: transform 120ms ease;
+}
+
+.file-entry-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.file-entry-chevron svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .file-entry-icon {
   display: inline-flex;
   flex: 0 0 14px;
@@ -588,6 +616,13 @@ body.panel-resizing {
    lifted chip in every theme (--chrome-bg-hover derives from the theme, stays
    visible on dark and light); colour accents belong to the document, not the
    shell. The old hardcoded orange (#F1752D) ignored themes entirely. */
+#file-list .file-empty {
+  padding: 4px 8px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-style: italic;
+}
+
 #file-list button.active,
 #outline-list button.active {
   background: var(--chrome-bg-hover);
