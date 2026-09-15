@@ -69,9 +69,9 @@
 **发版**
 
 1. 用 `git log` 确认 main 上已包含本版要发的全部提交，不要靠记忆
-2. 版本号、`resources/demo/changelog.md`、README 路线图（中英同步）四处对齐
+2. 版本号、`resources/demo/changelog.md`、README 路线图（中英同步）四处对齐。changelog 里本版那一段同时就是 Release 页面的正文（CI 直接取用；缺了段落会警告并退回 PR 列表，仍然发布）
 3. 提交信息写清本版包含哪些修复
-4. 打 tag 推送，等 CI 三平台全绿，再核对 Release 资产齐全：mac universal 的 dmg 与 zip、Windows exe、Linux AppImage 与 deb，以及 blockmap 和 latest*.yml
+4. 打 tag 推送，等 CI 三平台全绿，再核对 Release 资产齐全：macOS 双架构各自的 dmg 与 zip、Windows 的 exe 与免安装 zip、Linux 的 AppImage 与 deb，以及 blockmap 和 latest*.yml
 5. 发版后在真机安装核对：能启动，且本版声称修好的问题确实可见
 6. 补 `docs/social/` 的对外文案
 

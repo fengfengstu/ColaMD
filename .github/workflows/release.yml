@@ -87,12 +87,45 @@ jobs:
       contents: write
 
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: Create GitHub Release
+      # The version's section in resources/demo/changelog.md is what users
+      # read in the app, so it is also what they read on the release page.
+      # GitHub's generated notes only ever listed merge commits.
+      - name: Take the release notes from the changelog
+        id: notes
+        run: |
+          set -euo pipefail
+          awk -v v="${GITHUB_REF_NAME#v}" '
+            BEGIN { target = "## v" v }
+            index($0, target) == 1 { found = 1; print; next }
+            found && /^## / { exit }
+            found { print }
+          ' resources/demo/changelog.md > "$RUNNER_TEMP/notes.md"
+          if [ -s "$RUNNER_TEMP/notes.md" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Release notes::resources/demo/changelog.md has no section for ${GITHUB_REF_NAME}; publishing with generated notes"
+          fi
+
+      - name: Publish with the changelog section
+        if: steps.notes.outputs.found == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          body_path: ${{ runner.temp }}/notes.md
+
+      # A missing section still publishes, so a typo in the version number
+      # cannot leave a tagged release unpublished. The warning above is the
+      # signal to add the missing section.
+      - name: Publish with generated notes
+        if: steps.notes.outputs.found != 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
