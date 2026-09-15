@@ -55,31 +55,43 @@ export function applyTheme(name: string, customCSS?: string): void {
     // The OS draws its three glyphs, and they have to sit at the same weight as
     // our four: the platform wants one SOLID colour, while the row's icons are a
     // translucent mix over the chrome, so composite it the way the browser would
-    // before handing it over. The first attempt passed the document's ink
-    // instead, and the three buttons came out visibly darker than the rest of the
-    // row on a real Windows machine (2026-09-15).
+    // before handing it over.
+    //
+    // Both values go over as plain #rrggbb, because the platform parses no CSS
+    // Color 4: Chromium hands us `color(srgb 0.1 0.1 0.1)`, Windows rejected the
+    // whole overlay call, and the buttons kept the colours from window creation on
+    // every theme — including a light strip on a black row (real Windows test,
+    // 2026-09-15). Painting each colour onto a canvas and reading the pixel back
+    // gives the platform the one string it understands.
     const iconEl = document.getElementById('file-toggle-btn') ?? document.body
     const icon = getComputedStyle(iconEl).color
-    window.electronAPI?.reportTitlebarColors?.({ background: surface, symbol: solidOver(icon, surface) })
+    const surfaceHex = painted(surface, '#ffffff')
+    window.electronAPI?.reportTitlebarColors?.({ background: surfaceHex, symbol: painted(icon, surfaceHex) })
   }
 }
 
-// Resolve what a translucent colour looks like painted on an opaque one. The OS
-// will not do the mixing, so it happens here, on a 1x1 canvas: exactly the pixels
-// the browser produces for the same pair.
-function solidOver(color: string, background: string): string {
-  const canvas = document.createElement('canvas')
-  canvas.width = 1
-  canvas.height = 1
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return color
-  ctx.fillStyle = background
-  ctx.fillRect(0, 0, 1, 1)
-  ctx.fillStyle = color
-  ctx.fillRect(0, 0, 1, 1)
-  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+// Resolve a colour to #rrggbb, as painted over an opaque one: a translucent value
+// is composited exactly the way the browser would, and any CSS colour syntax the
+// canvas understands (the platform understands fewer) comes back as hex.
+function painted(color: string, background: string): string {
   const hex = (value: number): string => value.toString(16).padStart(2, '0')
-  return `#${hex(r)}${hex(g)}${hex(b)}`
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1
+    canvas.height = 1
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return color
+    ctx.fillStyle = background
+    ctx.fillRect(0, 0, 1, 1)
+    ctx.fillStyle = color
+    ctx.fillRect(0, 0, 1, 1)
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+    return `#${hex(r)}${hex(g)}${hex(b)}`
+  } catch {
+    // An unparseable colour keeps the caller's value rather than turning the
+    // window controls invisible.
+    return color
+  }
 }
 
 export function loadSavedTheme(): string {

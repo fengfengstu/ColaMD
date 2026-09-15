@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell, session, clipboard, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, session, clipboard, screen, nativeTheme } from 'electron'
 import { execFile } from 'child_process'
 import { autoUpdater } from 'electron-updater'
 import { join, basename, dirname, extname, isAbsolute, resolve, relative } from 'path'
@@ -31,10 +31,12 @@ const releaseNoticePath = join(app.getPath('userData'), 'release-notice.json')
 // The shell's top row, in CSS pixels: the window controls overlay on Windows has
 // to be told the same height the renderer draws (design.md, one row).
 const TITLEBAR_HEIGHT = 40
-// What the overlay shows before the renderer reports its theme: the default
-// theme's chrome surface and ink. The renderer corrects it on first paint.
-const DEFAULT_OVERLAY_BG = '#e4e1de'
-const DEFAULT_OVERLAY_SYMBOL = '#3a342e'
+// What the overlay shows before the renderer reports its theme. The app's theme is
+// independent of the system's, so this can only be a guess: follow the system, and
+// the renderer corrects it on first paint (a wrong guess would otherwise flash a
+// light strip over a dark row).
+const lightOverlay = { bg: '#e4e1de', symbol: '#6f6b67' }
+const darkOverlay = { bg: '#1a1e24', symbol: '#8b939c' }
 
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown', '.mdown', '.mkd']
 
@@ -347,7 +349,7 @@ function createWindow(filePath?: string, initialContent?: string, initialBrowseP
     minHeight: 400,
     titleBarStyle: isWindows ? 'hidden' : 'hiddenInset',
     ...(isWindows
-      ? { titleBarOverlay: { color: DEFAULT_OVERLAY_BG, symbolColor: DEFAULT_OVERLAY_SYMBOL, height: TITLEBAR_HEIGHT } }
+      ? { titleBarOverlay: { ...(nativeTheme.shouldUseDarkColors ? { color: darkOverlay.bg, symbolColor: darkOverlay.symbol } : { color: lightOverlay.bg, symbolColor: lightOverlay.symbol }), height: TITLEBAR_HEIGHT } }
       : {}),
     trafficLightPosition: { x: 16, y: 14 },
     // Windows only: the menu bar is the second of the three bars, so it starts
@@ -1479,13 +1481,21 @@ ipcMain.handle('report-titlebar-colors', (event, colors: unknown) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (!win || win.isDestroyed()) return
   const payload = colors as { background?: unknown; symbol?: unknown } | null
-  const background = typeof payload?.background === 'string' ? payload.background : ''
+  // Plain #rrggbb only: the platform parses no CSS Color 4, and a value it cannot
+  // read fails the whole call, leaving the buttons on whatever they were created
+  // with (2026-09-15, a light strip over a black row shipped to a Windows tester
+  // because the renderer handed over `color(srgb …)`).
+  const hex = (value: unknown): string | null =>
+    typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : null
+  const background = hex(payload?.background)
   if (!background) return
-  const symbol = typeof payload?.symbol === 'string' && payload.symbol ? payload.symbol : undefined
+  const symbol = hex(payload?.symbol)
   try {
     win.setTitleBarOverlay({ color: background, ...(symbol ? { symbolColor: symbol } : {}), height: TITLEBAR_HEIGHT })
-  } catch {
-    /* the window was not created with an overlay: nothing to update */
+  } catch (error) {
+    // Not silent: a swallowed failure here is invisible in the UI, and that is
+    // exactly how the colours above went unnoticed until a Windows screenshot.
+    console.error('title bar overlay update failed:', error)
   }
 })
 
