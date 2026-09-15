@@ -959,9 +959,12 @@ body.show-file-panel #source-editor {
 }
 
 /* HR */
+/* A rule in the document is the same hairline as a heading's underline. It used
+   to be 2px, which is the one line in the document that was visibly heavier than
+   its neighbours (2026-09-15). */
 #editor .ProseMirror hr {
   border: none;
-  border-top: 2px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
   margin: 2em 0;
 }
 
