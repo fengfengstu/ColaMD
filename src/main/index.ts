@@ -154,6 +154,13 @@ function getPreferredLanguage(): UiLanguage {
   return preferredLanguage ?? (app.getLocale().toLowerCase().startsWith('zh') ? 'zh' : 'en')
 }
 
+// Dialogs the user sees during normal use follow the UI language too: they were
+// hardcoded Chinese, so an English window got Chinese buttons and vice versa
+// (2026-09-15).
+function uiText(zh: string, en: string): string {
+  return getPreferredLanguage() === 'zh' ? zh : en
+}
+
 function setPreferredLanguage(language: UiLanguage): void {
   preferredLanguage = language
   try {
@@ -1022,6 +1029,9 @@ ipcMain.handle('save-file', async (event, content: string, expectedPath?: string
   let filePath = sourcePath
   if (!filePath) {
     const result = await dialog.showSaveDialog(win, {
+      title: uiText('保存 Markdown 文档', 'Save Markdown document'),
+      buttonLabel: uiText('保存', 'Save'),
+      nameFieldLabel: uiText('文件名：', 'File name:'),
       defaultPath: suggestSavePath(win, suggestFileName(win, content)),
       filters: [
         { name: 'Markdown', extensions: ['md'] },
@@ -1049,6 +1059,9 @@ ipcMain.handle('save-file-as', async (event, content: string, expectedPath?: str
   const sourcePath = getState(win).filePath
   if (typeof expectedPath === 'string' && sourcePath !== (expectedPath.length > 0 ? expectedPath : null)) return null
   const result = await dialog.showSaveDialog(win, {
+    title: uiText('另存为', 'Save As'),
+    buttonLabel: uiText('保存', 'Save'),
+    nameFieldLabel: uiText('文件名：', 'File name:'),
     defaultPath: suggestSavePath(win, suggestFileName(win, content)),
     filters: [
       { name: 'Markdown', extensions: ['md'] },
@@ -1067,6 +1080,9 @@ ipcMain.handle('export-docx', async (event, content: unknown) => {
   win.focus()
   const baseName = suggestFileName(win, content) ?? 'untitled'
   const result = await dialog.showSaveDialog(win, {
+    title: uiText('导出 Word 文档', 'Export Word document'),
+    buttonLabel: uiText('导出', 'Export'),
+    nameFieldLabel: uiText('文件名：', 'File name:'),
     defaultPath: suggestSavePath(win, `${baseName}.docx`),
     filters: [{ name: 'Word Document', extensions: ['docx'] }]
   })
@@ -1080,8 +1096,8 @@ ipcMain.handle('export-docx', async (event, content: unknown) => {
     console.error('Word export failed', error)
     await dialog.showMessageBox(win, {
       type: 'error',
-      buttons: ['好'],
-      message: '无法导出 Word 文档',
+      buttons: [uiText('好', 'OK')],
+      message: uiText('无法导出 Word 文档', 'Could not export the Word document'),
       detail: error instanceof Error ? error.message : String(error),
     })
     return false
@@ -1098,6 +1114,9 @@ ipcMain.handle('export-image', async (event, snapshot: unknown, preset: unknown)
   const baseName = suggestFileName(win) ?? 'untitled'
   const suffix = preset === 'desktop' ? 'desktop' : 'mobile'
   const result = await dialog.showSaveDialog(win, {
+    title: uiText('导出 PNG 图片', 'Export PNG images'),
+    buttonLabel: uiText('导出', 'Export'),
+    nameFieldLabel: uiText('文件名：', 'File name:'),
     defaultPath: suggestSavePath(win, `${baseName}-${suffix}.png`),
     filters: [{ name: 'PNG Image', extensions: ['png'] }]
   })
@@ -1117,11 +1136,11 @@ ipcMain.handle('export-image', async (event, snapshot: unknown, preset: unknown)
     if (conflicts.length > 0) {
       const response = await dialog.showMessageBox(win, {
         type: 'warning',
-        buttons: ['取消', '替换'],
+        buttons: [uiText('取消', 'Cancel'), uiText('替换', 'Replace')],
         defaultId: 0,
         cancelId: 0,
-        message: '部分图片已存在',
-        detail: `将替换 ${conflicts.length} 张同名图片。`,
+        message: uiText('部分图片已存在', 'Some images already exist'),
+        detail: uiText(`将替换 ${conflicts.length} 张同名图片。`, `${conflicts.length} image${conflicts.length === 1 ? '' : 's'} with the same name will be replaced.`),
       })
       if (response.response !== 1) return false
     }
@@ -1133,8 +1152,8 @@ ipcMain.handle('export-image', async (event, snapshot: unknown, preset: unknown)
     console.error('Image export failed', error)
     await dialog.showMessageBox(win, {
       type: 'error',
-      buttons: ['好'],
-      message: '无法导出图片',
+      buttons: [uiText('好', 'OK')],
+      message: uiText('无法导出图片', 'Could not export the images'),
       detail: error instanceof Error ? error.message : String(error),
     })
     return false
@@ -1145,6 +1164,9 @@ ipcMain.handle('export-pdf', async (event) => {
   const win = getWinFromEvent(event)
   if (!win) return false
   const result = await dialog.showSaveDialog(win, {
+    title: uiText('导出 PDF', 'Export PDF'),
+    buttonLabel: uiText('导出', 'Export'),
+    nameFieldLabel: uiText('文件名：', 'File name:'),
     defaultPath: suggestSavePath(win, suggestFileName(win)),
     filters: [{ name: 'PDF', extensions: ['pdf'] }]
   })
@@ -1199,6 +1221,9 @@ ipcMain.handle('export-html', async (event, snapshot: {
   if (!win) return false
   const baseName = suggestFileName(win, snapshot.content) ?? 'untitled'
   const result = await dialog.showSaveDialog(win, {
+    title: uiText('导出 HTML', 'Export HTML'),
+    buttonLabel: uiText('导出', 'Export'),
+    nameFieldLabel: uiText('文件名：', 'File name:'),
     defaultPath: suggestSavePath(win, `${baseName}.html`),
     filters: [{ name: 'HTML', extensions: ['html'] }]
   })
@@ -1373,11 +1398,17 @@ ipcMain.handle('report-external-conflict', async (event) => {
   const filePath = state.filePath
   const choice = await dialog.showMessageBox(win, {
     type: 'warning',
-    buttons: ['保留我的版本（继续编辑）', '加载磁盘上的版本（丢弃未保存的输入）'],
+    buttons: [
+      uiText('保留我的版本（继续编辑）', 'Keep my version (keep editing)'),
+      uiText('加载磁盘上的版本（丢弃未保存的输入）', 'Load the version on disk (discard unsaved input)')
+    ],
     defaultId: 0,
     cancelId: 0,
-    message: '文件已被其他程序修改',
-    detail: '你正在编辑的内容尚未保存，同时磁盘上的文件已被外部修改。请选择保留哪个版本。'
+    message: uiText('文件已被其他程序修改', 'The file was changed by another program'),
+    detail: uiText(
+      '你正在编辑的内容尚未保存，同时磁盘上的文件已被外部修改。请选择保留哪个版本。',
+      'Your edits are not saved yet, and the file on disk changed. Choose which version to keep.'
+    )
   })
   if (win.isDestroyed()) return
   if (choice.response === 1 && filePath) {
@@ -2043,11 +2074,14 @@ async function handleWindowClose(win: BrowserWindow, state: WindowState): Promis
     if (!state.dirty) return true
     const { response } = await dialog.showMessageBox(win, {
       type: 'warning',
-      buttons: ['仍要关闭', '取消'],
+      buttons: [uiText('仍要关闭', 'Close anyway'), uiText('取消', 'Cancel')],
       defaultId: 1,
       cancelId: 1,
-      message: '无法与编辑窗口通信',
-      detail: '窗口可能已停止响应，无法确认是否有未保存的修改。强行关闭可能丢失内容。'
+      message: uiText('无法与编辑窗口通信', 'Cannot reach the editor window'),
+      detail: uiText(
+        '窗口可能已停止响应，无法确认是否有未保存的修改。强行关闭可能丢失内容。',
+        'The window is not responding, so unsaved changes cannot be checked. Closing it may lose content.'
+      )
     })
     return response === 0
   }
@@ -2055,14 +2089,14 @@ async function handleWindowClose(win: BrowserWindow, state: WindowState): Promis
   if (!snapshot.dirty) return true
 
   const detail = state.filePath
-    ? `“${basename(state.filePath)}” 有未保存的修改。`
-    : '当前未命名文档有未保存的修改。'
+    ? uiText(`“${basename(state.filePath)}” 有未保存的修改。`, `“${basename(state.filePath)}” has unsaved changes.`)
+    : uiText('当前未命名文档有未保存的修改。', 'The current untitled document has unsaved changes.')
   const { response } = await dialog.showMessageBox(win, {
     type: 'warning',
-    buttons: ['保存', '不保存', '取消'],
+    buttons: [uiText('保存', 'Save'), uiText('不保存', "Don't Save"), uiText('取消', 'Cancel')],
     defaultId: 0,
     cancelId: 2,
-    message: '未保存的修改',
+    message: uiText('未保存的修改', 'Unsaved changes'),
     detail
   })
   if (response === 2) return false
@@ -2075,6 +2109,9 @@ async function handleWindowClose(win: BrowserWindow, state: WindowState): Promis
   let filePath = sourcePath
   if (!filePath) {
     const saveAs = await dialog.showSaveDialog(win, {
+      title: uiText('保存 Markdown 文档', 'Save Markdown document'),
+      buttonLabel: uiText('保存', 'Save'),
+      nameFieldLabel: uiText('文件名：', 'File name:'),
       defaultPath: suggestSavePath(win, suggestFileName(win, snapshot.content)),
       filters: [
         { name: 'Markdown', extensions: ['md'] },
@@ -2097,9 +2134,12 @@ async function handleWindowClose(win: BrowserWindow, state: WindowState): Promis
     } catch {
       await dialog.showMessageBox(win, {
         type: 'error',
-        buttons: ['好'],
-        message: '无法保存标签页',
-        detail: `“${basename(tab.path as string)}” 写入失败，为保护内容已取消关闭。`
+        buttons: [uiText('好', 'OK')],
+        message: uiText('无法保存标签页', 'Could not save the tab'),
+        detail: uiText(
+          `“${basename(tab.path as string)}” 写入失败，为保护内容已取消关闭。`,
+          `Writing “${basename(tab.path as string)}” failed, so closing was cancelled to protect the content.`
+        )
       })
       return false
     }
@@ -2107,11 +2147,14 @@ async function handleWindowClose(win: BrowserWindow, state: WindowState): Promis
   if (untitledTabs.length > 0) {
     const untitled = await dialog.showMessageBox(win, {
       type: 'warning',
-      buttons: ['取消', '丢弃未命名标签页'],
+      buttons: [uiText('取消', 'Cancel'), uiText('丢弃未命名标签页', 'Discard untitled tabs')],
       defaultId: 0,
       cancelId: 0,
-      message: '还有未命名的标签页没有保存',
-      detail: '关闭窗口会丢掉它们里的内容。请先切到那些标签页保存。'
+      message: uiText('还有未命名的标签页没有保存', 'Some untitled tabs are still unsaved'),
+      detail: uiText(
+        '关闭窗口会丢掉它们里的内容。请先切到那些标签页保存。',
+        'Closing the window would lose their content. Switch to those tabs and save them first.'
+      )
     })
     if (untitled.response === 0) return false
   }
@@ -2120,9 +2163,12 @@ async function handleWindowClose(win: BrowserWindow, state: WindowState): Promis
   if (!saved) {
     await dialog.showMessageBox(win, {
       type: 'error',
-      buttons: ['好'],
-      message: '无法保存文档',
-      detail: '为保护未保存的内容，已取消关闭。请检查文件权限和可用磁盘空间。'
+      buttons: [uiText('好', 'OK')],
+      message: uiText('无法保存文档', 'Could not save the document'),
+      detail: uiText(
+        '为保护未保存的内容，已取消关闭。请检查文件权限和可用磁盘空间。',
+        'Closing was cancelled to protect the unsaved content. Check file permissions and free disk space.'
+      )
     })
     return false
   }

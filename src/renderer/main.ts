@@ -1250,7 +1250,10 @@ function renderFileList(files: import('../preload/index').SiblingFile[]): void {
     const chevron = document.createElement('span')
     chevron.className = `file-entry-chevron${row.expanded ? ' expanded' : ''}${f.kind === 'parent' ? ' back' : ''}`
     chevron.setAttribute('aria-hidden', 'true')
-    if (f.kind === 'parent') chevron.innerHTML = '<svg viewBox="0 0 16 16"><path d="M13 8H3.5M7 4 3 8l4 4"/></svg>'
+    // Same 10-unit box and stroke as the expander chevrons: drawing the way back
+    // in a 16-unit box scaled into the same 10px slot made it smaller and its
+    // stroke lighter, so the two arrows read as different controls (2026-09-15).
+    if (f.kind === 'parent') chevron.innerHTML = '<svg viewBox="0 0 10 10"><path d="M8.5 5H2M4.5 2.5 2 5l2.5 2.5"/></svg>'
     else if (row.expandable) chevron.innerHTML = '<svg viewBox="0 0 10 10"><path d="M3.5 1.5 7 5l-3.5 3.5"/></svg>'
     const icon = document.createElement('span')
     icon.className = `file-entry-icon ${f.kind}`
@@ -1260,7 +1263,8 @@ function renderFileList(files: import('../preload/index').SiblingFile[]): void {
       : '<svg viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4z"/><path d="M9 2.5v3h3"/></svg>'
     const label = document.createElement('span')
     label.className = 'file-entry-name'
-    label.textContent = f.kind === 'parent' ? '..' : f.name
+    // Words, not two dots: the row has the space and ".." never said where it goes.
+    label.textContent = f.kind === 'parent' ? (isChinese() ? '返回' : 'Back') : f.name
     btn.addEventListener('mouseenter', () => {
       // Only a name that is actually cut off is worth a label; one that fits
       // says itself. No marquee: sliding the name under the icon to read it
