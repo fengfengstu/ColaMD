@@ -859,6 +859,12 @@ function updateUiLanguage(): void {
   sourceToggleBtnEl().setAttribute('aria-label', zh ? '切换 Markdown 源码 / 所见即所得' : 'Toggle Markdown source / WYSIWYG')
   const wordTip = wordCountEl().querySelector('.word-count-tip')
   if (wordTip) wordTip.textContent = zh ? '0 字 · 0 词 · 0 段' : '0 chars · 0 words · 0 paragraphs'
+  const menuBtn = document.getElementById('app-menu-btn')
+  if (menuBtn) {
+    menuBtn.setAttribute('aria-label', zh ? '菜单' : 'Menu')
+    const menuTip = menuBtn.querySelector('.toolbar-tip')
+    if (menuTip) menuTip.textContent = zh ? '菜单' : 'Menu'
+  }
   updateSourceToggle()
   updateWordCount()
 }
