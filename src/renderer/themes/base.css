@@ -460,12 +460,14 @@ body.panel-resizing {
   gap: 0;
   margin: 0 0 8px;
   padding: 2px;
-  /* One rectangle, not two: the tray carries a surface and nothing else, and
-     its 4px corners are the tabs' corners. The active chip then wears the
-     tabs' exact recipe — paper plus the same 1px hairline — so the sidebar and
-     the strip say "chosen" the same way. */
+  /* One rectangle, not two: the tray carries a surface and nothing else, so the
+     active chip can wear the tabs' exact recipe — paper plus the same 1px
+     hairline — and the sidebar and the strip say "chosen" the same way. */
   border: none;
-  border-radius: 4px;
+  /* Concentric with the chip inside it: outer radius = inner 4px + the 2px
+     inset, so the two outlines stay the same distance apart all the way round
+     the corner. 6px is also the radius the title-bar buttons already use. */
+  border-radius: 6px;
   /* The tray is the theme's raised chrome surface, not a hardcoded grey: a
      hardcoded tint sits at the same luminance as the paper chip in dark themes
      and the active state dissolves (2026-09-15). With --chrome-bg the chip
@@ -474,8 +476,10 @@ body.panel-resizing {
 }
 
 .file-panel-tabs button {
-  /* 30px: the same height as a tab, so the two controls are one size. */
-  min-height: 30px;
+  /* 26px inside a 2px tray: the switch's whole box is 30px, the height of a
+     tab, and the chip inside sits a step below the tab so the control does not
+     outweigh the document's own chip. */
+  min-height: 26px;
   /* Transparent, not absent: the active chip adds the hairline, and a border
      that appears only when chosen would shift the label by a pixel. */
   border: 1px solid transparent;
