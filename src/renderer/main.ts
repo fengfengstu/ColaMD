@@ -56,7 +56,8 @@ let outlineJumpTimer: ReturnType<typeof setTimeout> | null = null
 let outlineJumpStartTop = 0
 
 // Resizable file panel: default 220px, drag range 180-420px, persisted
-// locally (design.md). Applied at module load so the first paint already
+// locally (design.md: light, no permanent handle, hover feedback only).
+// Applied at module load so the first paint already
 // uses the saved width.
 const FILE_PANEL_MIN_WIDTH = 180
 const FILE_PANEL_MAX_WIDTH = 420
@@ -1123,7 +1124,7 @@ function togglePanel(): void {
 }
 
 // Drag the panel's right edge to resize it; the width clamps to the
-// design.md range and persists on release. Pointer capture keeps the drag
+// FILE_PANEL_* range and persists on release. Pointer capture keeps the drag
 // alive over iframes and selected text.
 function initPanelResize(): void {
   const resizer = document.getElementById('panel-resizer') as HTMLDivElement | null
