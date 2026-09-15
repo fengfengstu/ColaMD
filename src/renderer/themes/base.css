@@ -418,6 +418,14 @@ body {
   display: none;
 }
 
+/* With the panel shown, the strip starts on the panel's edge line: the first tab
+   sits exactly on the line the panel draws down the window, so the panel's right
+   edge and the tab's left edge are one vertical. The band itself still spans the
+   window — the panel starts below it, and nothing is cut. */
+body.show-file-panel #titlebar {
+  padding-left: calc(var(--file-panel-width, 220px) - 1px);
+}
+
 /* Edge hot zone for resizing the panel; deliberately handle-free — a hover
    stripe is the only affordance (design.md). */
 #panel-resizer {
