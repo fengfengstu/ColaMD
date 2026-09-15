@@ -107,6 +107,17 @@ jobs:
             found && /^## / { exit }
             found { print }
           ' resources/demo/changelog.md > "$RUNNER_TEMP/notes.md"
+          # The section below ours is the previous release, so the changelog
+          # alone gives the compare range: no need to fetch the tags.
+          PREVIOUS=$(awk -v v="${GITHUB_REF_NAME#v}" '
+            BEGIN { target = "## v" v }
+            index($0, target) == 1 { found = 1; next }
+            found && /^## v/ { print substr($2, 2); exit }
+          ' resources/demo/changelog.md)
+          if [ -s "$RUNNER_TEMP/notes.md" ] && [ -n "$PREVIOUS" ]; then
+            printf '\n**Full Changelog**: https://github.com/%s/compare/v%s...%s\n' \
+              "$GITHUB_REPOSITORY" "$PREVIOUS" "$GITHUB_REF_NAME" >> "$RUNNER_TEMP/notes.md"
+          fi
           if [ -s "$RUNNER_TEMP/notes.md" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
           else
