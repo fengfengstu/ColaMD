@@ -151,6 +151,10 @@ body {
   padding: 0 10px;
   border: 1px solid transparent;
   border-bottom: none;
+  /* Small radius on the top corners only, matching the sidebar's 文件/大纲
+     switch (4px). The bottom edge stays square so the active tab still opens
+     into the document instead of floating as a chip. */
+  border-radius: 4px 4px 0 0;
   background: transparent;
   color: var(--text-muted);
   font-family: inherit;
@@ -169,7 +173,7 @@ body {
 }
 
 /* The active tab wears the paper colour with no bottom edge, so it opens into the
-   document. Square corners and no shadow, and no accent line either: the paper set
+   document. No shadow, and no accent line either: the paper set
    against the chrome is the active state, and a 1px theme line on top of it made the
    strip shout for attention. */
 .tab-entry.active {

@@ -382,6 +382,29 @@ async function saveTabForLeaving(tab: DocumentTab | null): Promise<boolean> {
   return await saveCurrent()
 }
 
+// The window always holds at least one document, so the strip never shows a
+// lone plus next to a welcome screen that belongs to no tab: a launch with no
+// file seeds the first tab here, and a file that arrives later adopts it.
+function ensureTab(): DocumentTab {
+  const existing = activeTab()
+  if (existing) return existing
+  const tab: DocumentTab = {
+    id: `tab-${nextTabId++}`,
+    filePath: null,
+    dirty: false,
+    revision: documentRevision,
+    sourceMode: false,
+    sourceText: '',
+    content: '',
+    editorState: null,
+    diskContent: null,
+    scrollTop: 0
+  }
+  tabs.push(tab)
+  activeTabId = tab.id
+  return tab
+}
+
 async function openNewTab(): Promise<void> {
   const previous = activeTab()
   captureActiveTab()
@@ -1440,6 +1463,9 @@ async function init(): Promise<void> {
   })
   initPanelResize()
   bindTabBar(api)
+  // The launch document (the welcome screen or a restored file) is a tab from
+  // the first frame, so the strip never renders without one.
+  ensureTab()
   renderTabBar()
   fileTabEl().addEventListener('click', () => setPanelMode('files'))
   outlineTabEl().addEventListener('click', () => setPanelMode('outline'))
@@ -1486,26 +1512,19 @@ async function init(): Promise<void> {
   api.onMenuExportDOCX(() => { void api.exportDOCX(getContent()) })
   api.onMenuExportImage((preset) => { void exportCurrentImage(preset) })
 
-  api.onNewFile(() => { releaseMermaidRenderer(); exitSourceMode(); applyContent(''); scheduleOutlineUpdate() })
+  api.onNewFile(() => {
+    releaseMermaidRenderer()
+    exitSourceMode()
+    ensureTab()
+    applyContent('')
+    scheduleOutlineUpdate()
+    renderTabBar()
+  })
   api.onFileOpened((data) => {
     releaseMermaidRenderer()
-    // The window always opens with exactly one document; the bar for it appears
-    // only once the user creates a second tab.
-    if (tabs.length === 0) {
-      tabs.push({
-        id: `tab-${nextTabId++}`,
-        filePath: null,
-        dirty: false,
-        revision: documentRevision,
-        sourceMode: false,
-        sourceText: '',
-        content: '',
-        editorState: null,
-        diskContent: null,
-        scrollTop: 0
-      })
-      activeTabId = tabs[0].id
-    }
+    // A document opened into a window that has none yet (a launch with a file)
+    // lands in the first tab rather than creating a second one.
+    ensureTab()
     currentFilePath = data.path
     dirty = false
     const tab = activeTab()
