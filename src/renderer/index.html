@@ -27,6 +27,19 @@
 </head>
 <body>
   <div id="titlebar">
+    <!-- The menu button is Windows-only (hidden everywhere else; macOS has the menu
+         bar). On Windows a menu or options control belongs at the row's left end,
+         before the document's own strip: that is where a Windows user looks for
+         it, and the right end is taken by the three window buttons the system
+         paints there. -->
+    <button id="app-menu-btn" hidden aria-label="菜单">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
+        <line x1="2.5" y1="4.8" x2="13.5" y2="4.8"/>
+        <line x1="2.5" y1="8" x2="13.5" y2="8"/>
+        <line x1="2.5" y1="11.2" x2="13.5" y2="11.2"/>
+      </svg>
+      <span class="toolbar-tip">菜单</span>
+    </button>
     <div id="tab-bar" hidden></div>
     <span id="save-status" aria-live="polite"></span>
     <button id="file-toggle-btn" aria-label="显示 / 隐藏文件列表">
@@ -50,18 +63,6 @@
         <line x1="4.5" y1="9" x2="9.5" y2="9"/>
       </svg>
       <span class="toolbar-tip word-count-tip">0 字 · 0 词 · 0 段</span>
-    </button>
-    <!-- The menu button is the row's FOURTH icon, not a lone one: it belongs to the
-         same cluster as the three above and sits at its right end, next to the
-         window controls the OS paints there (Windows only, hidden everywhere else;
-         macOS has the menu bar, so the row keeps three icons). -->
-    <button id="app-menu-btn" hidden aria-label="菜单">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
-        <line x1="2.5" y1="4.8" x2="13.5" y2="4.8"/>
-        <line x1="2.5" y1="8" x2="13.5" y2="8"/>
-        <line x1="2.5" y1="11.2" x2="13.5" y2="11.2"/>
-      </svg>
-      <span class="toolbar-tip">菜单</span>
     </button>
   </div>
   <div id="hover-tip" hidden></div>

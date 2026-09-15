@@ -804,11 +804,12 @@ ipcMain.handle('get-file-manager-name', () => fileManagerName())
 // process (review on #87).
 ipcMain.handle('read-clipboard-text', () => clipboard.readText())
 
-// Electron 44 rebuilt the clipboard on the W3C API, so writes return a promise.
-// A rejected write must not surface as an unhandled rejection: node terminates
-// the process on those.
+// Electron 44 rebuilt the clipboard on the W3C API, so writes return a promise
+// at runtime, while the shipped types still declare void. A rejected write must
+// not surface as an unhandled rejection: node terminates the process on those.
 function copyToClipboard(text: string): void {
-  void clipboard.writeText(text).catch((err) => { console.error('clipboard write failed:', err) })
+  const write = clipboard.writeText(text) as unknown as Promise<void> | undefined
+  void write?.catch((err: unknown) => { console.error('clipboard write failed:', err) })
 }
 
 function fileManagerName(): 'finder' | 'explorer' | 'file-manager' {
@@ -1903,7 +1904,9 @@ function buildMenu(): void {
 // rewritten to the interface language. The role stays: it is what registers the
 // menu with macOS and keeps the system window-tiling shortcuts alive (#97).
 function localizeWindowMenu(menu: Menu, labels: { minimize: string; zoom: string; front: string }): void {
-  const windowMenu = menu.items.find((item) => item.role === 'windowmenu')
+  // Compared lowercased because Electron reports the role as 'windowmenu' while
+  // its own types spell the constructor option 'windowMenu'.
+  const windowMenu = menu.items.find((item) => String(item.role).toLowerCase() === 'windowmenu')
   if (!windowMenu?.submenu) return
   const byRole: Record<string, string> = {
     minimize: labels.minimize,

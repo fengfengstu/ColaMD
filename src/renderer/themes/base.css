@@ -364,6 +364,16 @@ body.platform-win #titlebar {
   display: none;
 }
 
+/* The Windows menu button is the row's first child, so it gets its own air
+   instead of the 8px gap the right-hand cluster uses: the row's 6px gutter is
+   its left margin, and 6px on the right puts the glyph exactly halfway between
+   the window's edge and the line the document's strip starts on. Inheriting the
+   shared margin-left left it jammed against the first tab (2026-09-15). */
+#titlebar > #app-menu-btn {
+  margin-left: 0;
+  margin-right: 6px;
+}
+
 /* One focus ring for the whole shell, drawn in the theme's own ink. The platform
    default follows the SYSTEM accent colour, so a keyboard focus inside a
    monochrome row came out orange on macOS (2026-09-15) and would come out a
