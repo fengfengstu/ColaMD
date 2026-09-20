@@ -74,12 +74,16 @@ let outlineJumpStartTop = 0
 const FILE_PANEL_MIN_WIDTH = 180
 const FILE_PANEL_MAX_WIDTH = 420
 const FILE_PANEL_DEFAULT_WIDTH = 220
+// The width currently applied. Kept beside the CSS variable so a drag that ends
+// without moving the pointer does not write the default over the reader's choice.
+let filePanelWidth = FILE_PANEL_DEFAULT_WIDTH
 
 function clampFilePanelWidth(width: number): number {
   return Math.min(FILE_PANEL_MAX_WIDTH, Math.max(FILE_PANEL_MIN_WIDTH, Math.round(width)))
 }
 
 function applyFilePanelWidth(width: number): void {
+  filePanelWidth = width
   document.documentElement.style.setProperty('--file-panel-width', `${width}px`)
 }
 
@@ -1178,7 +1182,7 @@ function togglePanel(): void {
   updatePanelVisibility()
 }
 
-// Drag the panel's right edge to resize it; the width clamps to the
+// Drag the panel's inner edge to resize it; the width clamps to the
 // FILE_PANEL_* range and persists on release. Pointer capture keeps the drag
 // alive over iframes and selected text.
 function initPanelResize(): void {
@@ -1189,11 +1193,13 @@ function initPanelResize(): void {
     resizer.setPointerCapture(event.pointerId)
     resizer.classList.add('dragging')
     document.body.classList.add('panel-resizing')
-    let width = FILE_PANEL_DEFAULT_WIDTH
+    // The width is the pointer's distance from the edge the panel hangs off, and
+    // that edge is not always the right one (#118): measuring the left side from
+    // the window's right edge pinned the panel to the maximum on the first move.
+    const onLeft = document.body.classList.contains('panel-left')
+    let width = filePanelWidth
     const move = (moveEvent: PointerEvent) => {
-      // The panel hangs off the right edge, so the pointer's distance from the
-      // window's right edge is the width.
-      width = clampFilePanelWidth(window.innerWidth - moveEvent.clientX)
+      width = clampFilePanelWidth(onLeft ? moveEvent.clientX : window.innerWidth - moveEvent.clientX)
       applyFilePanelWidth(width)
     }
     const finish = () => {
