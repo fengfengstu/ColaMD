@@ -56,7 +56,18 @@ body {
   --row-icon-color: color-mix(in srgb, var(--text-muted) 55%, transparent);
   --search-match-bg: color-mix(in srgb, var(--link-color) 18%, transparent);
   --search-match-current-bg: color-mix(in srgb, var(--link-color) 32%, transparent);
+  /* The reading column's width. A comfort setting, not a document property: the
+     View menu's Text Width switches the two body classes below, and everything
+     that lays text out reads this one value (the editor, source mode, and an
+     export snapshot, which carries the body class with it). */
+  --editor-column-width: 780px;
 }
+
+/* Text Width, from the View menu. `standard` needs no class: it is the value
+   body already carries. 640 is a comfortable measure on a narrow window, 1080
+   answers the wide displays where the default leaves two large margins. */
+body.page-width-narrow { --editor-column-width: 640px; }
+body.page-width-wide { --editor-column-width: 1080px; }
 
 #titlebar {
   /* The single top row. The strip, the save status and the three buttons are
@@ -461,9 +472,10 @@ body.platform-win #titlebar {
   display: none;
   height: calc(100vh - var(--chrome-row-height) - var(--tab-bar-height, 0px));
   width: 100%;
-  /* Center a column matching the visual editor (780px) so switching modes
-     keeps the text in the same place (#48). Falls back to 40px on narrow windows. */
-  padding: calc(40px + var(--editor-top-gap, 0px)) max(40px, calc((100% - 780px) / 2));
+  /* Center a column matching the visual editor (--editor-column-width) so
+     switching modes keeps the text in the same place (#48). Falls back to 40px
+     on narrow windows. */
+  padding: calc(40px + var(--editor-top-gap, 0px)) max(40px, calc((100% - var(--editor-column-width)) / 2));
   box-sizing: border-box;
   border: none;
   outline: none;
@@ -826,7 +838,7 @@ body.show-file-panel #source-editor {
 
 #editor .ProseMirror {
   outline: none;
-  max-width: 780px;
+  max-width: var(--editor-column-width);
   margin: 0 auto;
   /* Fills the wrapper, grows with the text. */
   flex: 1 0 auto;

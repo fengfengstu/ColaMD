@@ -1465,6 +1465,7 @@ let currentTheme = 'elegant'
 // preference (localStorage, beside the panel's width) and reports it here so the
 // View menu's checkmarks tell the truth; main keeps no copy of it on disk.
 let currentPanelSide: 'left' | 'right' = 'right'
+let currentPageWidth: 'narrow' | 'standard' | 'wide' = 'standard'
 let themeMenuItems: Array<{ id: string; theme: string }> = []
 // Enumerate installed system font families for the font settings dialog (#7752855).
 // Uses NSFontManager via JXA — the same source as the macOS font panel — so the
@@ -1566,6 +1567,14 @@ ipcMain.handle('report-panel-side', (_event, side: unknown) => {
   if (next === currentPanelSide) return
   currentPanelSide = next
   updatePanelSideMenuChecks()
+})
+
+ipcMain.handle('report-page-width', (_event, width: unknown) => {
+  const next: 'narrow' | 'standard' | 'wide' =
+    width === 'narrow' || width === 'wide' ? width : 'standard'
+  if (next === currentPageWidth) return
+  currentPageWidth = next
+  updatePageWidthMenuChecks()
 })
 
 // The Windows window controls are painted by the OS inside our own row, so their
@@ -1717,6 +1726,7 @@ function buildMenu(): void {
         setDefault: '设置为默认应用...',
         insertFormula: '插入公式', filePanel: '显示 / 隐藏文件列表', sourceMode: '切换 Markdown 源码',
         panelSide: '文件列表位置', panelSideLeft: '在左侧', panelSideRight: '在右侧',
+        pageWidth: '正文宽度', pageWidthNarrow: '窄', pageWidthStandard: '标准', pageWidthWide: '宽',
         light: '浅色', dark: '深色', elegant: '雅致',
         sepia: '羊皮纸', notion: '简白', bear: '熊红', writer: '作家',
         solarizedDark: '夜航', nord: '极地', gruvbox: '暖木', dracula: '德古拉', midnight: '午夜',
@@ -1738,6 +1748,7 @@ function buildMenu(): void {
         setDefault: 'Set as Default...',
         insertFormula: 'Insert Formula', filePanel: 'Show / Hide File List', sourceMode: 'Toggle Markdown Source',
         panelSide: 'File List Position', panelSideLeft: 'On the Left', panelSideRight: 'On the Right',
+        pageWidth: 'Text Width', pageWidthNarrow: 'Narrow', pageWidthStandard: 'Standard', pageWidthWide: 'Wide',
         light: 'Light', dark: 'Dark', elegant: 'Elegant',
         sepia: 'Sepia', notion: 'Notion', bear: 'Bear', writer: 'Writer',
         solarizedDark: 'Solarized Dark', nord: 'Nord', gruvbox: 'Gruvbox', dracula: 'Dracula', midnight: 'Midnight',
@@ -1961,6 +1972,17 @@ function buildMenu(): void {
         { type: 'separator' },
         { label: labels.fontSettings, click: () => sendToFocused('open-font-settings') },
         {
+          // The column's width is the renderer's preference, next to the panel's
+          // side and its width; this menu only asks for the change and then shows
+          // the answer (the renderer reports back, like the theme does).
+          label: labels.pageWidth,
+          submenu: [
+            { id: 'page-width-narrow', label: labels.pageWidthNarrow, type: 'checkbox' as const, checked: currentPageWidth === 'narrow', click: () => sendToFocused('set-page-width', 'narrow') },
+            { id: 'page-width-standard', label: labels.pageWidthStandard, type: 'checkbox' as const, checked: currentPageWidth === 'standard', click: () => sendToFocused('set-page-width', 'standard') },
+            { id: 'page-width-wide', label: labels.pageWidthWide, type: 'checkbox' as const, checked: currentPageWidth === 'wide', click: () => sendToFocused('set-page-width', 'wide') }
+          ]
+        },
+        {
           label: labels.language,
           submenu: [
             { label: labels.chinese, type: 'checkbox' as const, checked: getPreferredLanguage() === 'zh', click: () => setPreferredLanguage('zh') },
@@ -2067,6 +2089,15 @@ function updatePanelSideMenuChecks(): void {
   for (const side of ['left', 'right'] as const) {
     const item = menu.getMenuItemById(`panel-side-${side}`)
     if (item) item.checked = side === currentPanelSide
+  }
+}
+
+function updatePageWidthMenuChecks(): void {
+  const menu = Menu.getApplicationMenu()
+  if (!menu) return
+  for (const width of ['narrow', 'standard', 'wide'] as const) {
+    const item = menu.getMenuItemById(`page-width-${width}`)
+    if (item) item.checked = width === currentPageWidth
   }
 }
 

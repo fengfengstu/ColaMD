@@ -72,6 +72,8 @@ export interface ElectronAPI {
   onSetTheme: (callback: (theme: string) => void) => void
   onSetPanelSide: (callback: (side: string) => void) => void
   reportPanelSide: (side: string) => Promise<void>
+  onSetPageWidth: (callback: (width: string) => void) => void
+  reportPageWidth: (width: string) => Promise<void>
   onSetCustomCSS: (callback: (css: string) => void) => void
   onMenuImportTheme: (callback: () => void) => void
   onSearch: (callback: () => void) => void
@@ -136,6 +138,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadThemeCSS: (fileName: string) => ipcRenderer.invoke('load-theme-css', fileName),
   reportTheme: (theme: string) => ipcRenderer.invoke('report-theme', theme),
   reportPanelSide: (side: string) => ipcRenderer.invoke('report-panel-side', side),
+  reportPageWidth: (width: string) => ipcRenderer.invoke('report-page-width', width),
   reportTitlebarColors: (colors: { background: string; symbol: string }) => ipcRenderer.invoke('report-titlebar-colors', colors),
   popupAppMenu: () => ipcRenderer.invoke('popup-app-menu'),
   onFullscreenChange: (callback: (isFullscreen: boolean) => void) => {
@@ -194,6 +197,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onSetPanelSide: (callback: (side: string) => void) => {
     ipcRenderer.on('set-panel-side', (_event, side) => callback(side))
+  },
+  onSetPageWidth: (callback: (width: string) => void) => {
+    ipcRenderer.on('set-page-width', (_event, width) => callback(width))
   },
   onSetCustomCSS: (callback: (css: string) => void) => {
     ipcRenderer.on('set-custom-css', (_event, css) => callback(css))

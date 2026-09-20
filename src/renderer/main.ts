@@ -105,6 +105,29 @@ function applyPanelSide(side: string): void {
 
 applyPanelSide(localStorage.getItem(PANEL_SIDE_KEY) ?? 'right')
 
+// The reading column's width, three fixed steps chosen from the View menu. The
+// preference is a body class rather than an inline style, so the same class
+// travels inside the export snapshot and an exported image keeps the column the
+// author was reading. `standard` needs no class: it is what body already carries.
+const PAGE_WIDTH_KEY = 'colamd-page-width'
+
+const PAGE_WIDTH_CLASSES: Record<string, string> = {
+  narrow: 'page-width-narrow',
+  standard: '',
+  wide: 'page-width-wide'
+}
+
+function applyPageWidth(width: string): void {
+  const next = width in PAGE_WIDTH_CLASSES ? width : 'standard'
+  for (const className of Object.values(PAGE_WIDTH_CLASSES)) {
+    if (className) document.body.classList.toggle(className, className === PAGE_WIDTH_CLASSES[next])
+  }
+  localStorage.setItem(PAGE_WIDTH_KEY, next)
+  window.electronAPI?.reportPageWidth?.(next)
+}
+
+applyPageWidth(localStorage.getItem(PAGE_WIDTH_KEY) ?? 'standard')
+
 function setMarkdownProgrammatically(content: string, flushHistory = false): void {
   // Every way a document can be replaced at once ends up here (open, external
   // write, new file). The deck's pages are positions in the document that is
@@ -1743,6 +1766,7 @@ async function init(): Promise<void> {
   // The View menu's two choices land here. Nothing else follows the panel: the
   // side is a preference of the renderer's, like the panel's width.
   api.onSetPanelSide((side) => applyPanelSide(side))
+  api.onSetPageWidth((width) => applyPageWidth(width))
 
   // macOS takes the traffic lights away in full screen, so the row drops the 96px
   // they sit in. The main process owns the window state and reports it here, both
