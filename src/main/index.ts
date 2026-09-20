@@ -1401,6 +1401,10 @@ ipcMain.handle('load-theme-css', async (_event, fileName: string) => {
 // in place (never rebuild the menu from an IPC callback — setApplicationMenu
 // inside a menu-triggered path hangs the main process).
 let currentTheme = 'elegant'
+// Which side of the window the file panel occupies. The renderer owns the
+// preference (localStorage, beside the panel's width) and reports it here so the
+// View menu's checkmarks tell the truth; main keeps no copy of it on disk.
+let currentPanelSide: 'left' | 'right' = 'right'
 let themeMenuItems: Array<{ id: string; theme: string }> = []
 // Enumerate installed system font families for the font settings dialog (#7752855).
 // Uses NSFontManager via JXA — the same source as the macOS font panel — so the
@@ -1495,6 +1499,13 @@ ipcMain.handle('report-theme', (_event, theme: unknown) => {
   if (next === currentTheme) return
   currentTheme = next
   updateThemeMenuChecks()
+})
+
+ipcMain.handle('report-panel-side', (_event, side: unknown) => {
+  const next: 'left' | 'right' = side === 'left' ? 'left' : 'right'
+  if (next === currentPanelSide) return
+  currentPanelSide = next
+  updatePanelSideMenuChecks()
 })
 
 // The Windows window controls are painted by the OS inside our own row, so their
@@ -1645,6 +1656,7 @@ function buildMenu(): void {
         exportPDF: '导出 PDF...', exportHTML: '导出 HTML...', exportWord: '导出 Word...', exportImageDesktop: '导出图片（电脑阅读）...', exportImageMobile: '导出图片（手机阅读）...', find: '查找',
         setDefault: '设置为默认应用...',
         insertFormula: '插入公式', filePanel: '显示 / 隐藏文件列表', sourceMode: '切换 Markdown 源码',
+        panelSide: '文件列表位置', panelSideLeft: '在左侧', panelSideRight: '在右侧',
         light: '浅色', dark: '深色', elegant: '雅致',
         sepia: '羊皮纸', notion: '简白', bear: '熊红', writer: '作家',
         solarizedDark: '夜航', nord: '极地', gruvbox: '暖木', dracula: '德古拉', midnight: '午夜',
@@ -1665,6 +1677,7 @@ function buildMenu(): void {
         exportPDF: 'Export PDF...', exportHTML: 'Export HTML...', exportWord: 'Export Word...', exportImageDesktop: 'Export Image (Desktop)...', exportImageMobile: 'Export Image (Mobile)...', find: 'Find',
         setDefault: 'Set as Default...',
         insertFormula: 'Insert Formula', filePanel: 'Show / Hide File List', sourceMode: 'Toggle Markdown Source',
+        panelSide: 'File List Position', panelSideLeft: 'On the Left', panelSideRight: 'On the Right',
         light: 'Light', dark: 'Dark', elegant: 'Elegant',
         sepia: 'Sepia', notion: 'Notion', bear: 'Bear', writer: 'Writer',
         solarizedDark: 'Solarized Dark', nord: 'Nord', gruvbox: 'Gruvbox', dracula: 'Dracula', midnight: 'Midnight',
@@ -1863,6 +1876,16 @@ function buildMenu(): void {
           click: () => sendToFocused('toggle-file-panel')
         },
         {
+          // Which side the panel sits on is the renderer's preference, next to
+          // the panel's own width; this menu only asks for the change and shows
+          // the answer (the renderer reports back, like the theme does).
+          label: labels.panelSide,
+          submenu: [
+            { id: 'panel-side-right', label: labels.panelSideRight, type: 'checkbox' as const, checked: currentPanelSide === 'right', click: () => sendToFocused('set-panel-side', 'right') },
+            { id: 'panel-side-left', label: labels.panelSideLeft, type: 'checkbox' as const, checked: currentPanelSide === 'left', click: () => sendToFocused('set-panel-side', 'left') }
+          ]
+        },
+        {
           label: labels.sourceMode,
           accelerator: 'CmdOrCtrl+/',
           click: () => sendToFocused('toggle-source-mode')
@@ -1960,6 +1983,15 @@ function updateThemeMenuChecks(): void {
   for (const entry of themeMenuItems) {
     const item = menu.getMenuItemById(entry.id)
     if (item) item.checked = entry.theme === currentTheme
+  }
+}
+
+function updatePanelSideMenuChecks(): void {
+  const menu = Menu.getApplicationMenu()
+  if (!menu) return
+  for (const side of ['left', 'right'] as const) {
+    const item = menu.getMenuItemById(`panel-side-${side}`)
+    if (item) item.checked = side === currentPanelSide
   }
 }
 

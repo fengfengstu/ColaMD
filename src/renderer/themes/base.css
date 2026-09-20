@@ -527,6 +527,34 @@ body:not(.show-file-panel) #panel-resizer {
   display: none;
 }
 
+/* The panel can sit on either side (View menu, 2026-09-20). Deliberately the
+   smallest version of it: the panel and the room it claims move, the row does
+   not. The buttons stay at the right end where they have always been, and the
+   strip keeps the whole row instead of stopping one column short of it, because
+   the column it stopped short of is now on the other side. */
+body.panel-left #file-panel {
+  left: 0;
+  right: auto;
+  border-left: 0;
+  border-right: 1px solid var(--shell-line);
+}
+
+body.panel-left #panel-resizer {
+  left: calc(var(--file-panel-width, 220px) - 4px);
+  right: auto;
+}
+
+body.panel-left.show-file-panel {
+  --panel-column: 0px;
+}
+
+/* The button cannot follow the panel to the left end (it stays where it has
+   always been), so the icon is the only thing left that can point at the list:
+   the same mirror the file-list icon got when the panel moved right (2026-09-15). */
+body.panel-left #file-toggle-btn svg {
+  transform: scaleX(-1);
+}
+
 #panel-resizer:hover::after,
 #panel-resizer.dragging::after {
   background: color-mix(in srgb, var(--text-color) 24%, transparent);
@@ -753,6 +781,13 @@ body.panel-resizing {
 body.show-file-panel #editor,
 body.show-file-panel #source-editor {
   margin-right: var(--file-panel-width, 220px);
+}
+
+/* The mirror of that margin, for the side the panel is on. */
+body.panel-left.show-file-panel #editor,
+body.panel-left.show-file-panel #source-editor {
+  margin-right: 0;
+  margin-left: var(--file-panel-width, 220px);
 }
 
 /* The source editor has an explicit width, so account for the panel margin

@@ -83,6 +83,22 @@ function applyFilePanelWidth(width: number): void {
 
 applyFilePanelWidth(clampFilePanelWidth(Number.parseInt(localStorage.getItem('file-panel-width') ?? '', 10) || FILE_PANEL_DEFAULT_WIDTH))
 
+// Which side the panel sits on. Only the panel moves: the row keeps its shape and
+// its three buttons stay at the right end, which is the smallest version of this
+// that answers the people who reach for the left (2026-09-20). The preference
+// lives here, beside the panel's width, and main is told about it only so the View
+// menu's checkmarks tell the truth.
+const PANEL_SIDE_KEY = 'colamd-panel-side'
+
+function applyPanelSide(side: string): void {
+  const next = side === 'left' ? 'left' : 'right'
+  document.body.classList.toggle('panel-left', next === 'left')
+  localStorage.setItem(PANEL_SIDE_KEY, next)
+  window.electronAPI?.reportPanelSide?.(next)
+}
+
+applyPanelSide(localStorage.getItem(PANEL_SIDE_KEY) ?? 'right')
+
 function setMarkdownProgrammatically(content: string, flushHistory = false): void {
   applyingProgrammaticChange = true
   try {
@@ -1652,6 +1668,10 @@ async function init(): Promise<void> {
   })
 
   api.onSetTheme((theme) => applyTheme(theme))
+
+  // The View menu's two choices land here. Nothing else follows the panel: the
+  // side is a preference of the renderer's, like the panel's width.
+  api.onSetPanelSide((side) => applyPanelSide(side))
 
   // macOS takes the traffic lights away in full screen, so the row drops the 96px
   // they sit in. The main process owns the window state and reports it here, both
