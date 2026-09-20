@@ -752,7 +752,22 @@ function openFile(filePath: string): void {
   win.focus()
 }
 
+// An untitled window is the natural place for a document that arrives from
+// outside the app, but not any untitled window: on macOS it is easy to leave one
+// behind another app or on another Space, and delivering the file there looks
+// exactly like the file never arrived, because the window that came to the front
+// is the one the user was already in (issue #105). Prefer the window the user is
+// actually looking at, then fall back to the first one.
 function findEmptyWindow(): BrowserWindow | null {
+  const isEmpty = (win: BrowserWindow | null): boolean => {
+    if (!win || win.isDestroyed()) return false
+    const state = windowStates.get(win.id)
+    return !!state && !state.filePath
+  }
+
+  const focused = BrowserWindow.getFocusedWindow()
+  if (isEmpty(focused)) return focused
+
   for (const [id, state] of windowStates) {
     if (!state.filePath) {
       return BrowserWindow.fromId(id) || null
