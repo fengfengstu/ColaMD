@@ -1,4 +1,5 @@
 import { createEditor, flashHeadingOnArrival, focusEditor, getMarkdown, onEditorJumpPhase, setMarkdown, setEditorEditable, showMathModal, setMathModalLanguage, releaseMermaidRenderer, getEditorState, restoreEditorState, applyMarkdownStyle, runFormatCommand, type FormatCommandId } from './editor/editor'
+import { markdownForWord } from './editor/mermaid-export'
 import { isPresenting, startSlideshow, stopSlideshow } from './slideshow'
 import { enterPrintLayout, exitPrintLayout } from './slides-export'
 import { detectMarkdownStyle } from './editor/markdown-style'
@@ -1729,7 +1730,13 @@ async function init(): Promise<void> {
   api.onMenuSaveAs(() => { void saveCurrent(true) })
   api.onMenuExportPDF(() => api.exportPDF())
   api.onMenuExportHTML(() => { void exportCurrentHTML() })
-  api.onMenuExportDOCX(() => { void api.exportDOCX(getContent()) })
+  api.onMenuExportDOCX(async () => {
+    // Diagrams are drawn again for the page rather than reused from the screen
+    // (src/renderer/editor/mermaid-export.ts), so this awaits a render per
+    // diagram before the save dialog opens.
+    const payload = await markdownForWord(getContent(), isChinese())
+    await api.exportDOCX(payload)
+  })
   api.onMenuExportImage((preset) => { void exportCurrentImage(preset) })
   api.onMenuPlaySlideshow(() => { void toggleSlideshow() })
 

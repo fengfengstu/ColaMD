@@ -38,7 +38,7 @@ The two items below are the ones actually blocking us. Everything else on this p
 
 **Reported:** export to image fails for some users, on both desktop and mobile export modes.
 
-**Needed:** a document that reproduces it. Export shares one rendering path across the export options, so a failing file usually points straight at the cause.
+**Needed:** a document that reproduces it. Export draws the document in one hidden window and captures it, and a document taller than 16384 device pixels continues as numbered pages, so a failure now points at either the render window or that limit. The earlier debugging-protocol and scrolling fallbacks are gone (2026-09-21), which is why a failure seen before that change is worth re-reporting against the current release.
 
 **How to help:** comment on [#88](https://github.com/marswaveai/ColaMD/issues/88) with the failing document (or a cut-down version), the platform, the export option used, and whether the current release still fails.
 
@@ -74,7 +74,19 @@ All twelve built-in themes already ship as standalone, commented CSS files in [`
 
 **Sources:** [#31](https://github.com/marswaveai/ColaMD/issues/31)
 
-**Status:** Exports GFM document structure, common inline formatting, lists, tables, links, code blocks, and standalone local images to `.docx`. HTML and unsupported syntax degrade to text.
+**Status:** Exports GFM document structure, common inline formatting, lists, tables, links, code blocks, and standalone local images to `.docx`. HTML and unsupported syntax degrade to text. Mermaid diagrams are drawn into the document as images, see below.
+
+### Diagrams in the Word export
+
+**Sources:** [#107](https://github.com/marswaveai/ColaMD/issues/107)
+
+**Status:** Every Mermaid block in the document becomes a picture in the `.docx`. Diagrams are rendered again for the export with Mermaid's light palette, because Word is a white page: the one on screen may belong to a dark theme, and in source mode there is no diagram on screen at all. A diagram that cannot be rendered keeps its code fence, so one broken block cannot fail an export.
+
+### Text width
+
+**Sources:** [#110](https://github.com/marswaveai/ColaMD/issues/110)
+
+**Status:** View → Text Width switches the reading column between narrow (640), standard (780, the default) and wide (1080). The preference lives beside the other local preferences and applies to the editor, to source mode (which stays aligned with the editor, see [#48](https://github.com/marswaveai/ColaMD/issues/48)) and to the HTML and PDF exports. An exported image is not affected: it is drawn at its own reading width by design.
 
 ### Export shareable images
 
@@ -110,7 +122,13 @@ All twelve built-in themes already ship as standalone, commented CSS files in [`
 
 **Source:** [#49](https://github.com/marswaveai/ColaMD/issues/49)
 
-**Status:** A quiet `未保存 / 已保存` hint sits beside the filename in the title bar. `未保存` shows while edits are pending; `已保存` flashes after autosave or manual save, then fades out. No timestamps, no toasts.
+**Status:** A quiet `未保存 / 已保存` hint sits beside the filename in the title bar. It is also the one place that reports an external-edit conflict waiting on a choice, and, after the disk version is loaded, that the dropped version is still on disk (the hint is clickable there and reveals the file). No timestamps, no toasts.
+
+### A copy is kept before unsaved work is discarded
+
+**Sources:** [#115](https://github.com/marswaveai/ColaMD/issues/115)
+
+**Status:** Loading the disk version after an external edit is the one action that used to throw unsaved input away with no trace (the editor flushes its undo history at the same time). The dropped version is now written to `~/.colamd/recovered/<document>-<timestamp>.md` first, the dialog button says so before it happens, and the title bar reports where it went. If the copy cannot be written, nothing is discarded: the editor keeps its version. The wider request behind this issue (a version history with retention and a restore view) is not planned; see Candidates.
 
 ### Heading anchor navigation
 
@@ -260,6 +278,12 @@ Bug report: opening the first .md is fast, but opening another file while one is
 
 
 
+### Document version history (bounded snapshots)
+
+**Sources:** [#115](https://github.com/marswaveai/ColaMD/issues/115)
+
+**Status:** Candidate, the wider version of what shipped. A snapshot schedule, a retention policy and a list with diffs to restore from is a subsystem: it needs a place to live, a story for how long copies survive, and a view to pick from. What shipped instead is the safety net for the one irreversible path (a copy of the version being discarded, written next to the other app data). Revisit if the copies prove hard to find, or if a second irreversible path appears.
+
 ### Plugin ecosystem
 
 **Raised:** 2026-09-11, by the maintainer.
@@ -342,6 +366,12 @@ Fenced code blocks currently render as plain styled text with a copy button, wit
 
 
 ## Declined
+
+### Theme following the system appearance
+
+**Source:** [#113](https://github.com/marswaveai/ColaMD/issues/113), [PR #116](https://github.com/marswaveai/ColaMD/pull/116)
+
+Declined (2026-09-21). Two reasons, both visible in the proposed PR. It is a default behaviour change with no switch, so a reader who picked a theme would have it overridden by the OS, and the automatic switch writes its choice into the saved theme, so a chosen theme is lost and does not come back. The payoff is small: the theme menu is one click away, and it is the reader who knows whether a document wants light or dark paper. Recorded here so the same request does not have to be re-argued from scratch.
 
 ### Cross-directory file tree in the panel
 

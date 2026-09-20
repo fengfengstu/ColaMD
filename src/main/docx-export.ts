@@ -33,6 +33,10 @@ interface MarkdownNode {
 export interface DocxExportInput {
   content: string
   sourcePath: string | null
+  // Diagrams the renderer drew for this export, keyed by the name the rewritten
+  // Markdown points at (`![示意图](colamd-diagram-1.png)`). They arrive as PNG
+  // data URLs because they exist only in memory.
+  images?: Record<string, string>
 }
 
 function headingForDepth(depth: number): (typeof HeadingLevel)[keyof typeof HeadingLevel] {
@@ -91,12 +95,15 @@ function imagePath(url: string, sourcePath: string | null): string | null {
   return isAbsolute(url) ? url : resolve(dirname(sourcePath), decodeURIComponent(url))
 }
 
-function imageParagraph(node: MarkdownNode, sourcePath: string | null): Paragraph {
-  const path = node.url ? imagePath(node.url, sourcePath) : null
-  if (!path) return new Paragraph({ children: [new TextRun({ text: node.alt ? `[${node.alt}]` : '[image]', italics: true })] })
-
-  const image = nativeImage.createFromPath(path)
-  if (image.isEmpty()) return new Paragraph({ children: [new TextRun({ text: node.alt ? `[${node.alt}]` : '[image]', italics: true })] })
+function imageParagraph(node: MarkdownNode, sourcePath: string | null, images: Record<string, string> | undefined): Paragraph {
+  const dataURL = node.url && images ? images[node.url] : undefined
+  const image = dataURL
+    ? nativeImage.createFromDataURL(dataURL)
+    : (() => {
+        const path = node.url ? imagePath(node.url, sourcePath) : null
+        return path ? nativeImage.createFromPath(path) : null
+      })()
+  if (!image || image.isEmpty()) return new Paragraph({ children: [new TextRun({ text: node.alt ? `[${node.alt}]` : '[image]', italics: true })] })
 
   const size = image.getSize()
   const scale = Math.min(1, 560 / size.width, 420 / size.height)
@@ -120,7 +127,7 @@ function tableForNode(node: MarkdownNode): Table {
   })
 }
 
-function blockNodes(nodes: MarkdownNode[] | undefined, sourcePath: string | null, listDepth = 0): Array<Paragraph | Table> {
+function blockNodes(nodes: MarkdownNode[] | undefined, sourcePath: string | null, images?: Record<string, string>, listDepth = 0): Array<Paragraph | Table> {
   if (!nodes) return []
   const output: Array<Paragraph | Table> = []
   for (const node of nodes) {
@@ -128,9 +135,9 @@ function blockNodes(nodes: MarkdownNode[] | undefined, sourcePath: string | null
       output.push(new Paragraph({ heading: headingForDepth(node.depth ?? 1), children: inlineRuns(node.children) }))
     } else if (node.type === 'paragraph') {
       const image = node.children?.length === 1 && node.children[0]?.type === 'image' ? node.children[0] : null
-      output.push(image ? imageParagraph(image, sourcePath) : new Paragraph({ children: inlineRuns(node.children), spacing: { after: 120 } }))
+      output.push(image ? imageParagraph(image, sourcePath, images) : new Paragraph({ children: inlineRuns(node.children), spacing: { after: 120 } }))
     } else if (node.type === 'image') {
-      output.push(imageParagraph(node, sourcePath))
+      output.push(imageParagraph(node, sourcePath, images))
     } else if (node.type === 'blockquote') {
       output.push(new Paragraph({
         children: [new TextRun({ text: textContent(node), italics: true })],
@@ -153,7 +160,7 @@ function blockNodes(nodes: MarkdownNode[] | undefined, sourcePath: string | null
           indent: { left: 360 + listDepth * 360, hanging: 240 },
           spacing: { after: 60 },
         }))
-        output.push(...blockNodes(item.children?.filter((child) => child !== first), sourcePath, listDepth + 1))
+        output.push(...blockNodes(item.children?.filter((child) => child !== first), sourcePath, images, listDepth + 1))
       }
     } else if (node.type === 'table') {
       output.push(tableForNode(node))
@@ -164,7 +171,7 @@ function blockNodes(nodes: MarkdownNode[] | undefined, sourcePath: string | null
     } else if (node.type === 'footnoteDefinition') {
       output.push(new Paragraph({ children: [new TextRun({ text: textContent(node), size: 18, color: '667085' })] }))
     } else {
-      output.push(...blockNodes(node.children, sourcePath, listDepth))
+      output.push(...blockNodes(node.children, sourcePath, images, listDepth))
     }
   }
   return output
@@ -175,7 +182,7 @@ export async function markdownToDocx(input: DocxExportInput): Promise<Buffer> {
   const document = new Document({
     creator: 'ColaMD',
     title: input.sourcePath ? basename(input.sourcePath, extname(input.sourcePath)) : 'Untitled',
-    sections: [{ children: blockNodes(tree.children, input.sourcePath) }],
+    sections: [{ children: blockNodes(tree.children, input.sourcePath, input.images) }],
   })
   return Packer.toBuffer(document)
 }

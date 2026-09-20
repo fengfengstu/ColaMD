@@ -43,7 +43,7 @@ export interface ElectronAPI {
   saveFileAs: (content: string, expectedPath?: string) => Promise<string | null>
   exportPDF: () => Promise<boolean>
   exportHTML: (snapshot: { content: string; html: string; styles: string; bodyClass: string }) => Promise<boolean>
-  exportDOCX: (content: string) => Promise<boolean>
+  exportDOCX: (payload: { content: string; images: Record<string, string> }) => Promise<boolean>
   exportImage: (snapshot: ImageExportSnapshot, preset: ImageExportPreset) => Promise<boolean>
   getLanguage: () => Promise<'zh' | 'en'>
   onLanguageChanged: (callback: (language: 'zh' | 'en') => void) => void
@@ -127,7 +127,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFileAs: (content: string, expectedPath?: string) => ipcRenderer.invoke('save-file-as', content, expectedPath),
   exportPDF: () => ipcRenderer.invoke('export-pdf'),
   exportHTML: (snapshot: { content: string; html: string; styles: string; bodyClass: string }) => ipcRenderer.invoke('export-html', snapshot),
-  exportDOCX: (content: string) => ipcRenderer.invoke('export-docx', content),
+  exportDOCX: (payload: { content: string; images: Record<string, string> }) => ipcRenderer.invoke('export-docx', payload),
   exportImage: (snapshot: ImageExportSnapshot, preset: ImageExportPreset) => ipcRenderer.invoke('export-image', snapshot, preset),
   getLanguage: () => ipcRenderer.invoke('get-language') as Promise<'zh' | 'en'>,
   onLanguageChanged: (callback: (language: 'zh' | 'en') => void) => {

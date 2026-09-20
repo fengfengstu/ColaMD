@@ -1156,11 +1156,16 @@ ipcMain.handle('save-file-as', async (event, content: string, expectedPath?: str
   return ok ? result.filePath : null
 })
 
-ipcMain.handle('export-docx', async (event, content: unknown) => {
+ipcMain.handle('export-docx', async (event, payload: unknown) => {
   const win = getWinFromEvent(event)
+  const content = typeof payload === 'object' && payload !== null ? (payload as { content?: unknown }).content : payload
+  const images = typeof payload === 'object' && payload !== null ? (payload as { images?: unknown }).images : undefined
   if (!win || typeof content !== 'string') return false
   win.show()
   win.focus()
+  const diagramImages = images && typeof images === 'object' && !Array.isArray(images)
+    ? Object.fromEntries(Object.entries(images as Record<string, unknown>).filter(([, value]) => typeof value === 'string') as Array<[string, string]>)
+    : undefined
   const baseName = suggestFileName(win, content) ?? 'untitled'
   const result = await dialog.showSaveDialog(win, {
     title: uiText('导出 Word 文档', 'Export Word document'),
@@ -1172,7 +1177,7 @@ ipcMain.handle('export-docx', async (event, content: unknown) => {
   if (result.canceled || !result.filePath) return false
   try {
     const { markdownToDocx } = await import('./docx-export')
-    await writeFile(result.filePath, await markdownToDocx({ content, sourcePath: getState(win).filePath }))
+    await writeFile(result.filePath, await markdownToDocx({ content, sourcePath: getState(win).filePath, images: diagramImages }))
     shell.showItemInFolder(result.filePath)
     return true
   } catch (error) {

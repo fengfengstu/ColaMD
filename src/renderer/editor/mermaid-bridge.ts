@@ -89,7 +89,7 @@ function ensureIframe(): void {
   document.body.appendChild(iframe)
 }
 
-function dispatchRender(code: string, resolve: (svg: string) => void, reject: (reason: Error) => void): void {
+function dispatchRender(code: string, resolve: (svg: string) => void, reject: (reason: Error) => void, options: { theme?: 'default' | 'dark'; bg?: string } = {}): void {
   const id = ++nextRenderId
   const timer = setTimeout(() => {
     pending.delete(id)
@@ -97,8 +97,10 @@ function dispatchRender(code: string, resolve: (svg: string) => void, reject: (r
     destroyIframe()
   }, RENDER_TIMEOUT_MS)
   pending.set(id, { resolve, reject, timer })
-  const bg = getComputedStyle(document.body).getPropertyValue('--code-block-bg').trim()
-  iframe?.contentWindow?.postMessage({ type: 'render', id, code, theme: mermaidThemeForBackground(bg), bg }, '*')
+  // The palette follows the surface the diagram is drawn on. On screen that is
+  // the code block's own colour; an export says which one it wants.
+  const bg = options.bg ?? getComputedStyle(document.body).getPropertyValue('--code-block-bg').trim()
+  iframe?.contentWindow?.postMessage({ type: 'render', id, code, theme: options.theme ?? mermaidThemeForBackground(bg), bg }, '*')
 }
 
 window.addEventListener('message', (event) => {
@@ -128,13 +130,14 @@ export function releaseMermaidRenderer(): void {
   destroyIframe()
 }
 
-export function renderMermaid(code: string): Promise<string> {
+export function renderMermaid(code: string, options: { theme?: 'default' | 'dark'; bg?: string } = {}): Promise<string> {
   ensureIframe()
   return new Promise<string>((resolve, reject) => {
+    const run = () => dispatchRender(code, resolve, reject, options)
     if (ready) {
-      dispatchRender(code, resolve, reject)
+      run()
     } else {
-      waitingForReady.push({ run: () => dispatchRender(code, resolve, reject), reject })
+      waitingForReady.push({ run, reject })
     }
   })
 }
