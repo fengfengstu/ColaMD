@@ -15,13 +15,13 @@ import { join } from 'node:path'
 const APP = new URL('..', import.meta.url).pathname.replace(/\/$/, '')
 const WORK = join(homedir(), 'Library', 'Caches', `colamd-verify-export-${Date.now()}`)
 
-// 短的应导出成一张连续长图，长的应退回编号页
+// 短的应导出成一张连续长图，长的应退回编号页；两个阅读宽度走的是同一套逻辑
 const CASES = [
-  { name: 'short', rows: 60, expect: 'single' },
-  { name: 'long', rows: 130, expect: 'pages' }
+  { name: 'short', preset: 'desktop', width: 1200, rows: 60, expect: 'single' },
+  { name: 'long', preset: 'desktop', width: 1200, rows: 130, expect: 'pages' },
+  { name: 'mobile-short', preset: 'mobile', width: 414, rows: 30, expect: 'single' },
+  { name: 'mobile-long', preset: 'mobile', width: 414, rows: 130, expect: 'pages' }
 ]
-
-const PRESET_WIDTH = 1200 // desktop 阅读宽度，用来反推设备像素比
 
 // 行号编码成颜色：base 7 的三个通道，相邻行至少差 30，取色不会有歧义
 function colorOf(index) {
@@ -168,7 +168,7 @@ async function runCase(testCase) {
 
     await evaluate(main, `(() => {
       const { BrowserWindow } = require('electron')
-      BrowserWindow.getAllWindows()[0].webContents.send('menu-export-image', 'desktop')
+      BrowserWindow.getAllWindows()[0].webContents.send('menu-export-image', ${JSON.stringify(testCase.preset)})
       return true
     })()`)
 
@@ -219,7 +219,7 @@ function check(testCase, { pages, analysed }) {
   const perPage = analysed.map((page) => runs(page.sequence))
   const interior = perPage.flatMap((page) => page.slice(1, -1))
   const rowHeight = median(interior.map((run) => run.length))
-  const dpr = analysed[0].size.width / PRESET_WIDTH
+  const dpr = analysed[0].size.width / testCase.width
 
   if (pages.length === 1) {
     const all = perPage[0]
