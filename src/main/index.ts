@@ -1204,8 +1204,8 @@ ipcMain.handle('export-image', async (event, snapshot: unknown, preset: unknown)
   })
   if (result.canceled || !result.filePath) return false
   try {
-    const { renderDocumentPNGs } = await import('./image-export')
-    const pages = await renderDocumentPNGs({ html, styles, bodyClass, background }, preset)
+    const { renderDocumentImages } = await import('./image-export')
+    const pages = await renderDocumentImages({ html, styles, bodyClass, background }, preset)
     if (pages.length === 0) throw new Error('没有可导出的内容')
 
     const extension = extname(result.filePath)

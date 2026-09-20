@@ -78,9 +78,9 @@ All twelve built-in themes already ship as standalone, commented CSS files in [`
 
 ### Export shareable images
 
-**Sources:** [#35](https://github.com/marswaveai/ColaMD/issues/35)
+**Sources:** [#35](https://github.com/marswaveai/ColaMD/issues/35), [PR #121](https://github.com/marswaveai/ColaMD/pull/121)
 
-**Status:** Exports desktop and mobile reading pages as separate PNG files. Longer documents continue as numbered pages, with the final page trimmed to its content.
+**Status:** Exports the whole document as one continuous PNG at the desktop or mobile reading width. A document too tall for a single image (16384 device pixels on a side) continues as numbered reading pages, with the final page trimmed to its content, so every document still exports.
 
 ### Document outline
 

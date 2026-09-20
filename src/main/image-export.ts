@@ -12,22 +12,25 @@ export interface ImageExportSnapshot {
   background: string
 }
 
+// The reading width is the document's layout width; the height is what one
+// numbered page holds when a document is too tall to be a single image.
 const PRESETS: Record<ImageExportPreset, { width: number; height: number; padding: number }> = {
   desktop: { width: 1200, height: 800, padding: 64 },
   mobile: { width: 414, height: 896, padding: 28 },
 }
 
-// Every step below used to be able to wait forever: a screenshot command that
-// never comes back leaves the user with no window, no file and no message,
-// which is exactly what #88 reported on Windows. Each wait now has a deadline,
-// so the worst case is a visible error instead of silence.
+// A captured surface can be at most 16384 device pixels on a side. Measured on
+// macOS: asking for 16384 comes back with an image, asking for 16800 comes back
+// empty. A document taller than that continues as numbered reading pages (the
+// behaviour before 2.5.0) instead of failing, so every document still exports.
+const MAX_CAPTURE_EDGE_PX = 16384
+
+// Every wait below used to be able to wait forever: a capture that never comes
+// back leaves the user with no window, no file and no message, which is exactly
+// what #88 reported on Windows. Each wait has a deadline, so the worst case is a
+// visible error instead of silence.
 const LAYOUT_TIMEOUT_MS = 15000
 const CAPTURE_TIMEOUT_MS = 20000
-// The scroll fallback below is slow on a long document, so it gets a smaller
-// deadline per page and a ceiling for the whole export: failing with a message
-// beats grinding for minutes.
-const FALLBACK_CAPTURE_TIMEOUT_MS = 8000
-const FALLBACK_TOTAL_BUDGET_MS = 60000
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -106,61 +109,72 @@ async function waitForLayout(win: BrowserWindow): Promise<PageDimensions> {
   })()`)
 }
 
-// The screenshots come from the debugger protocol, which can capture past the
-// viewport. If that route stalls, scroll the page instead and let Electron take
-// the picture: lower resolution, but a finished export beats a stuck one.
-async function captureSliceByScroll(
+// The window is the camera: give it the height the export needs and let it paint
+// before the picture is taken. Resizing re-renders, so the frame has to land
+// before anything is captured.
+async function resizeAndSettle(win: BrowserWindow, width: number, height: number): Promise<void> {
+  win.setContentSize(width, height)
+  await win.webContents.executeJavaScript('new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+}
+
+// One continuous image for the whole document. Because the window itself is made
+// as tall as the document, a plain capture covers everything: no debugger
+// protocol to lose its target (#121), no scrolling and no stitching (stitching a
+// long document is where that pull request lost whole lines).
+async function captureWholeDocument(
   win: BrowserWindow,
+  dimensions: PageDimensions,
+  viewportHeight: number
+): Promise<Buffer | null> {
+  if (dimensions.height > MAX_CAPTURE_EDGE_PX) return null
+  try {
+    await resizeAndSettle(win, dimensions.width, dimensions.height)
+    const image = await withTimeout(
+      win.webContents.capturePage({ x: 0, y: 0, width: dimensions.width, height: dimensions.height }),
+      CAPTURE_TIMEOUT_MS,
+      'capturePage'
+    )
+    const size = image.getSize()
+    await resizeAndSettle(win, dimensions.width, viewportHeight)
+    if (size.width === 0 || size.height < dimensions.height) return null
+    return image.toPNG()
+  } catch (error) {
+    // A document the surface refuses to paint is still exportable as pages, so
+    // this is a reason to split, not a reason to give up.
+    console.error('Falling back to reading pages', error)
+    await resizeAndSettle(win, dimensions.width, viewportHeight)
+    return null
+  }
+}
+
+// A reading page's worth of a document that is too tall to be one image. The
+// content is translated, not scrolled: scrollTop clamps at the end of the
+// document, and that mismatch is what shifted slices and lost content before.
+async function captureReadingPage(
+  win: BrowserWindow,
+  dimensions: PageDimensions,
   offset: number,
-  clip: { width: number; height: number }
+  height: number
 ): Promise<Buffer> {
+  await resizeAndSettle(win, dimensions.width, height)
   await win.webContents.executeJavaScript(`(() => {
-    window.scrollTo(0, ${offset})
+    document.body.style.transform = 'translateY(${-offset}px)'
     return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   })()`)
   const image = await withTimeout(
-    win.webContents.capturePage({ x: 0, y: 0, width: clip.width, height: clip.height }),
-    FALLBACK_CAPTURE_TIMEOUT_MS,
+    win.webContents.capturePage({ x: 0, y: 0, width: dimensions.width, height }),
+    CAPTURE_TIMEOUT_MS,
     'capturePage'
   )
   return image.toPNG()
 }
 
-async function captureSlice(
-  win: BrowserWindow,
-  offset: number,
-  clip: { x: number; y: number; width: number; height: number },
-  fallbackSpentMs: { value: number }
-): Promise<Buffer> {
-  // Test hook, in the spirit of COLAMD_STARTUP_TRACE: force the fallback so the
-  // path that only Windows takes can be exercised on a machine where the normal
-  // route works.
-  if (process.env.COLAMD_FORCE_CAPTURE_FALLBACK === '1') {
-    return captureSliceByScroll(win, offset, clip)
-  }
-  try {
-    const screenshot = await withTimeout(
-      win.webContents.debugger.sendCommand('Page.captureScreenshot', {
-        format: 'png',
-        fromSurface: true,
-        captureBeyondViewport: true,
-        clip: { ...clip, scale: 2 },
-      }) as Promise<{ data: string }>,
-      CAPTURE_TIMEOUT_MS,
-      'Page.captureScreenshot'
-    )
-    return Buffer.from(screenshot.data, 'base64')
-  } catch (error) {
-    if (fallbackSpentMs.value > FALLBACK_TOTAL_BUDGET_MS) throw error
-    console.error('Falling back to capturePage', error)
-    const startedAt = Date.now()
-    const buffer = await captureSliceByScroll(win, offset, clip)
-    fallbackSpentMs.value += Date.now() - startedAt
-    return buffer
-  }
-}
-
-export async function renderDocumentPNGs(snapshot: ImageExportSnapshot, preset: ImageExportPreset): Promise<Buffer[]> {
+// One image per document when it fits, otherwise one per reading page. The
+// caller writes one file for one image, and numbered files for several.
+export async function renderDocumentImages(
+  snapshot: ImageExportSnapshot,
+  preset: ImageExportPreset
+): Promise<Buffer[]> {
   const { width, height: pageHeight } = PRESETS[preset]
   const win = new BrowserWindow({
     show: false,
@@ -170,7 +184,7 @@ export async function renderDocumentPNGs(snapshot: ImageExportSnapshot, preset: 
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
-      // A hidden window still has to produce frames, otherwise every screenshot
+      // A hidden window still has to produce frames, otherwise every capture
       // waits for a picture that is never painted. (Electron paints initially
       // hidden windows by default; throttling is what switches that off.)
       backgroundThrottling: false,
@@ -184,22 +198,23 @@ export async function renderDocumentPNGs(snapshot: ImageExportSnapshot, preset: 
     await writeFile(exportPath, exportHTML(snapshot, preset), 'utf8')
     await win.loadFile(exportPath)
     win.webContents.beginFrameSubscription(() => {})
-    win.webContents.debugger.attach('1.3')
     const dimensions = await withTimeout(waitForLayout(win), LAYOUT_TIMEOUT_MS, 'waitForLayout')
       .catch((error) => {
         console.error('Layout never settled, measuring as-is', error)
         return measureLayout(win)
       })
+
+    const single = await captureWholeDocument(win, dimensions, pageHeight)
+    if (single) return [single]
+
     const pages: Buffer[] = []
-    const fallbackSpentMs = { value: 0 }
     for (let offset = 0; offset < dimensions.height; offset += pageHeight) {
       const height = Math.min(pageHeight, dimensions.height - offset)
-      pages.push(await captureSlice(win, offset, { x: 0, y: offset, width: dimensions.width, height }, fallbackSpentMs))
+      pages.push(await captureReadingPage(win, dimensions, offset, height))
     }
     return pages
   } finally {
     if (!win.isDestroyed()) {
-      if (win.webContents.debugger.isAttached()) win.webContents.debugger.detach()
       win.webContents.endFrameSubscription()
       win.destroy()
     }
