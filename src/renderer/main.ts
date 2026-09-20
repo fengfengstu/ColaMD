@@ -186,7 +186,34 @@ function clearSaveStatus(): void {
   if (el) {
     el.classList.remove('pending', 'saved')
     el.textContent = ''
+    // The slot is plain text by default (pointer-events: none in the markup);
+    // the recovery hint is the one message that can be clicked.
+    el.removeAttribute('title')
+    el.style.pointerEvents = ''
+    el.style.cursor = ''
+    el.onclick = null
   }
+}
+
+// After the disk version is loaded, the dropped version still exists in
+// ~/.colamd/recovered. Saying so is the entire point of keeping it, so the hint
+// takes the save-status slot for a while and opens the folder when clicked.
+function showRecoveryHint(recoveryPath: string): void {
+  const el = saveStatusEl()
+  if (!el) return
+  if (saveStatusTimer) {
+    clearTimeout(saveStatusTimer)
+    saveStatusTimer = null
+  }
+  el.classList.remove('pending', 'saved')
+  el.textContent = isChinese() ? '未保存的内容已存成恢复文件' : 'Unsaved version kept as a recovery file'
+  el.title = isChinese() ? '点击在 Finder 中显示' : 'Click to show in the file manager'
+  el.style.pointerEvents = 'auto'
+  el.style.cursor = 'pointer'
+  el.onclick = () => {
+    void window.electronAPI?.revealPath?.(recoveryPath)
+  }
+  saveStatusTimer = setTimeout(() => clearSaveStatus(), 12000)
 }
 
 // An external edit landing while the user still has unsaved changes must never
@@ -209,7 +236,7 @@ function raiseExternalConflict(): void {
     el.classList.remove('saved')
     el.classList.add('pending')
   }
-  window.electronAPI.reportExternalConflict?.()
+  window.electronAPI.reportExternalConflict?.(getFileContent())
 }
 
 // --- Tabs (design.md) ---
@@ -1793,6 +1820,7 @@ async function init(): Promise<void> {
       resetDirty()
       updateWordCount()
       scheduleOutlineUpdate()
+      if (typeof result.recoveryPath === 'string') showRecoveryHint(result.recoveryPath)
     } else {
       // Keep mine: resume autosave; the next save overwrites the external edit.
       showSaveStatus('dirty')

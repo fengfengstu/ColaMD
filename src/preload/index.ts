@@ -87,8 +87,9 @@ export interface ElectronAPI {
   listSystemFonts: () => Promise<string[]>
   onEditorFontChanged: (callback: (prefs: { family: string; size: number }) => void) => void
   onOpenFontSettings: (callback: () => void) => void
-  reportExternalConflict: () => Promise<void>
-  onExternalConflictResult: (callback: (result: { action: 'keep' | 'load'; content?: string }) => void) => void
+  reportExternalConflict: (content: string) => Promise<void>
+  onExternalConflictResult: (callback: (result: { action: 'keep' | 'load'; content?: string; recoveryPath?: string }) => void) => void
+  revealPath: (target: string) => Promise<boolean>
   onUpdateAvailable: (callback: (version: string) => void) => void
   onUpdateDownloaded: (callback: (version: string) => void) => void
   onUpdateProgress: (callback: (percent: number) => void) => void
@@ -238,12 +239,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onOpenFontSettings: (callback: () => void) => {
     ipcRenderer.on('open-font-settings', () => callback())
   },
-  reportExternalConflict: () => {
-    return ipcRenderer.invoke('report-external-conflict')
+  reportExternalConflict: (content: string) => {
+    return ipcRenderer.invoke('report-external-conflict', content)
   },
-  onExternalConflictResult: (callback: (result: { action: 'keep' | 'load'; content?: string }) => void) => {
+  onExternalConflictResult: (callback: (result: { action: 'keep' | 'load'; content?: string; recoveryPath?: string }) => void) => {
     ipcRenderer.on('external-conflict-result', (_event, result) => callback(result))
   },
+  revealPath: (target: string) => ipcRenderer.invoke('reveal-path', target) as Promise<boolean>,
   onUpdateAvailable: (callback: (version: string) => void) => {
     ipcRenderer.on('update-available', (_event, version) => callback(version))
   },

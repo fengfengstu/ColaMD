@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu, shell, session, clipboard, screen, nativeTheme } from 'electron'
 import { execFile } from 'child_process'
 import { autoUpdater } from 'electron-updater'
-import { join, basename, dirname, extname, isAbsolute, resolve, relative } from 'path'
+import { join, basename, dirname, extname, isAbsolute, resolve, relative, sep } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { appendFile, readFile, writeFile, readdir, copyFile, mkdir, stat } from 'fs/promises'
 import { watch, FSWatcher, existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'fs'
@@ -26,6 +26,7 @@ function writeStartupTrace(): void {
 
 
 const themesDir = join(app.getPath('home'), '.colamd', 'themes')
+const recoveryDir = join(app.getPath('home'), '.colamd', 'recovered')
 const releaseNoticePath = join(app.getPath('userData'), 'release-notice.json')
 
 // The shell's top row, in CSS pixels: the window controls overlay on Windows has
@@ -1519,7 +1520,7 @@ ipcMain.handle('set-editor-font', (_event, prefs: unknown) => {
 
 // External edit collided with unsaved local changes. Pause the editor's
 // autosave (renderer side) and ask the user which version survives.
-ipcMain.handle('report-external-conflict', async (event) => {
+ipcMain.handle('report-external-conflict', async (event, localContent: unknown) => {
   const win = getWinFromEvent(event)
   if (!win) {
     event.sender.send('external-conflict-result', { action: 'keep' })
@@ -1531,7 +1532,7 @@ ipcMain.handle('report-external-conflict', async (event) => {
     type: 'warning',
     buttons: [
       uiText('保留我的版本（继续编辑）', 'Keep my version (keep editing)'),
-      uiText('加载磁盘上的版本（丢弃未保存的输入）', 'Load the version on disk (discard unsaved input)')
+      uiText('加载磁盘上的版本（我的内容会存成恢复文件）', 'Load the version on disk (my version is kept as a recovery file)')
     ],
     defaultId: 0,
     cancelId: 0,
@@ -1545,14 +1546,54 @@ ipcMain.handle('report-external-conflict', async (event) => {
   if (choice.response === 1 && filePath) {
     try {
       const data = await readFile(filePath, 'utf-8')
+      // Loading the disk version is the one move in this app that throws unsaved
+      // input away for good (the editor flushes its undo history at the same
+      // time), so the version being dropped is written down first. If that write
+      // fails we do NOT discard anything: the fall-through keeps the user's
+      // version in the editor instead.
+      const recoveryPath = await keepRecoveredCopy(filePath, localContent)
+      if (!recoveryPath) throw new Error('未保留恢复副本')
       state.lastInternalSaveContent = data
-      event.sender.send('external-conflict-result', { action: 'load', content: resolveImagePaths(data, filePath) })
+      event.sender.send('external-conflict-result', {
+        action: 'load',
+        content: resolveImagePaths(data, filePath),
+        recoveryPath
+      })
       return
-    } catch {
-      // fall through to keep-mine when the file cannot be read
+    } catch (error) {
+      console.error('Could not keep the unsaved version, keeping the editor version instead', error)
     }
   }
   event.sender.send('external-conflict-result', { action: 'keep' })
+})
+
+// The copy that makes discarding safe. Named after the document so the folder
+// stays readable years later, with a local timestamp to the second.
+async function keepRecoveredCopy(filePath: string, content: unknown): Promise<string | null> {
+  if (typeof content !== 'string' || content.trim() === '') return null
+  const now = new Date()
+  const pad = (value: number) => String(value).padStart(2, '0')
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+  const target = join(recoveryDir, `${basename(filePath, extname(filePath))}-${stamp}.md`)
+  try {
+    await mkdir(recoveryDir, { recursive: true })
+    await writeFile(target, content, 'utf-8')
+    return target
+  } catch (error) {
+    console.error('Could not write the recovery copy', error)
+    return null
+  }
+}
+
+// The renderer names the recovery file it was just told about; nothing outside
+// our own recovery folder is allowed through.
+ipcMain.handle('reveal-path', (_event, target: unknown) => {
+  if (typeof target !== 'string' || !target) return false
+  const root = resolve(recoveryDir)
+  const path = resolve(target)
+  if (path !== root && !path.startsWith(root + sep)) return false
+  shell.showItemInFolder(path)
+  return true
 })
 
 ipcMain.handle('report-theme', (_event, theme: unknown) => {
