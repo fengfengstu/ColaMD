@@ -1152,8 +1152,12 @@ body.web-playground *::-webkit-scrollbar-corner {
 
 .search-panel {
   position: fixed;
-  top: 10px;
-  right: 56px;
+  /* Below the top row, like every other floating layer: the row is where the
+     window controls live (our own three buttons on macOS, the system's on
+     Windows), and a panel placed inside it ends up with its buttons sitting on
+     top of the find field (issue #112). */
+  top: calc(var(--chrome-row-height) + var(--tab-bar-height, 0px) + 8px);
+  right: 12px;
   z-index: 1000;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto auto;

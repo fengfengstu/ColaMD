@@ -1228,7 +1228,12 @@ ipcMain.handle('export-pdf', async (event) => {
         @page { margin: 20mm 18mm; background: ${background}; }
         html, body, #editor { height: auto !important; overflow: visible !important; background: ${background} !important; }
         #editor { margin: 0 !important; padding: 0 !important; }
-        #editor .ProseMirror { min-height: auto !important; }
+        /* A cell has to break a long token (JSON, a URL) instead of forcing the
+           table wider than the page: one unbreakable string sets a minimum width
+           the table cannot go below, and the last column ends up cut off at the
+           paper's edge (#108). The table already carries width: 100% in the
+           theme; this is what lets it actually shrink to that width. */
+        #editor .ProseMirror th, #editor .ProseMirror td { overflow-wrap: anywhere !important; word-break: break-word !important; }
       }`
     )
     try {
