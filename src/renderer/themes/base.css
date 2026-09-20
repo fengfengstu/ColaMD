@@ -300,6 +300,17 @@ body.platform-win #titlebar {
   transition: opacity 0s, background 0.12s, color 0.12s;
 }
 
+/* 16×16 是保持「静止的标签恰好贴着文件名」所需的可见尺寸，但它低于 24×24
+   的最小点击热区。这一圈不可见的外扩把热区补到 24×24：它不绘制任何东西，
+   所以按钮用来遮住背后文字的实色底仍然是 16×16；它绝对定位，所以不参与
+   flex 排版，标签宽度与行高一个像素都不动。按钮静止时 pointer-events 为 none，
+   伪元素继承，于是看不见的时候也不会被点到。 */
+.tab-entry-close::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+
 .tab-entry.active .tab-entry-close {
   background: var(--bg-color);
 }
