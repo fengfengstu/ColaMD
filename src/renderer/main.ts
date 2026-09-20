@@ -1,5 +1,6 @@
 import { createEditor, flashHeadingOnArrival, focusEditor, getMarkdown, onEditorJumpPhase, setMarkdown, showMathModal, setMathModalLanguage, releaseMermaidRenderer, getEditorState, restoreEditorState, applyMarkdownStyle, runFormatCommand, type FormatCommandId } from './editor/editor'
 import { detectMarkdownStyle } from './editor/markdown-style'
+import { splitFrontmatter } from './editor/frontmatter'
 import { SearchPanel } from './editor/search-panel'
 import { applyTheme, loadSavedTheme } from './themes/theme-manager'
 import { setUiLanguage, isChinese, type UiLanguage } from './ui-language'
@@ -27,6 +28,14 @@ const updateBannerActionEl = () => document.getElementById('update-banner-action
 let currentFilePath: string | null = null
 let fileManagerName: import('../preload/index').FileManagerName = 'file-manager'
 let dirty = false
+// The active document's YAML frontmatter. It is carried here instead of inside
+// the editor: the rich text parser would rewrite it on the way back out, and it
+// belongs in the file exactly as it was written (issue #109).
+let activeFrontmatter = ''
+// The line ending the file on disk uses. The editor hands back `\n` whatever the
+// file was written with, and rewriting a Windows file from top to bottom on the
+// next save is a change nobody asked for.
+let activeLineEnding = '\n'
 // Programmatic Markdown replacement dispatches a synchronous ProseMirror
 // transaction. Suppress only that transaction, never a time window of input.
 let applyingProgrammaticChange = false
@@ -168,6 +177,8 @@ interface DocumentTab {
   sourceMode: boolean
   sourceText: string
   content: string
+  frontmatter: string
+  lineEnding: string
   editorState: import('@milkdown/kit/prose/state').EditorState | null
   diskContent: string | null
   scrollTop: number
@@ -212,7 +223,9 @@ function captureActiveTab(): void {
   tab.dirty = dirty
   tab.revision = documentRevision
   tab.sourceMode = sourceModeActive
-  tab.content = getContent()
+  tab.frontmatter = activeFrontmatter
+  tab.lineEnding = activeLineEnding
+  tab.content = getFileContent()
   if (sourceModeActive) {
     tab.sourceText = sourceEl().value
     tab.scrollTop = sourceEl().scrollTop
@@ -388,6 +401,9 @@ function renderTabBar(): void {
 function showBlankDocument(): void {
   releaseMermaidRenderer()
   exitSourceMode()
+  // A blank document carries no properties block from the one before it.
+  activeFrontmatter = ''
+  activeLineEnding = '\n'
   applyingProgrammaticChange = true
   try {
     setMarkdown('', true)
@@ -427,6 +443,8 @@ function ensureTab(): DocumentTab {
     sourceMode: false,
     sourceText: '',
     content: '',
+    frontmatter: '',
+    lineEnding: '\n',
     editorState: null,
     diskContent: null,
     scrollTop: 0
@@ -448,6 +466,8 @@ async function openNewTab(): Promise<void> {
     sourceMode: false,
     sourceText: '',
     content: '',
+    frontmatter: '',
+    lineEnding: '\n',
     editorState: null,
     diskContent: null,
     scrollTop: 0
@@ -480,7 +500,11 @@ async function activateTab(id: string): Promise<void> {
     const disk = await window.electronAPI.activateFile(target.filePath)
     // This document may have been written in a different style than the one we
     // are leaving; restore its own serialiser style with its content.
-    applyMarkdownStyle(detectMarkdownStyle(target.content))
+    // The tab's own properties block comes back with it, and the style probe
+    // reads the document without it: a line of YAML is not Markdown emphasis.
+    activeFrontmatter = target.frontmatter
+    activeLineEnding = target.lineEnding
+    applyMarkdownStyle(detectMarkdownStyle(splitFrontmatter(target.content).body))
     activeTabId = target.id
     currentFilePath = target.filePath
     documentRevision = target.revision
@@ -749,7 +773,7 @@ async function runAutosave(): Promise<void> {
   if (!dirty || !currentFilePath) return
   const revision = documentRevision
   const filePath = currentFilePath
-  const content = getContent()
+  const content = getFileContent()
   // rebuildMenu=false: autosave must never rebuild the app menu (macOS IME)
   // autosave=true: the main process may refuse the write when the file changed
   // on disk since our last read or write, and ask the user instead.
@@ -764,7 +788,7 @@ async function runAutosave(): Promise<void> {
 
 async function saveCurrent(saveAs = false): Promise<boolean> {
   const revision = documentRevision
-  const content = getContent()
+  const content = getFileContent()
   const expectedPath = currentFilePath
   // '' states plainly that the active document is untitled, so a save can never
   // be written into a file the window happens to have open in another tab.
@@ -1320,26 +1344,43 @@ function exitSourceMode(): void {
 
 const LARGE_DOCUMENT_SOURCE_THRESHOLD = 512 * 1024
 
+// A whole file arrives from disk: an open, or a reload after an external write.
+// Keep its properties block beside the document and hand the editor the rest.
+function takeFrontmatter(fileText: string): string {
+  const split = splitFrontmatter(fileText)
+  activeFrontmatter = split.frontmatter
+  activeLineEnding = fileText.includes('\r\n') ? '\r\n' : '\n'
+  return split.body
+}
+
 function setContent(content: string, flushHistory = false): void {
+  const body = takeFrontmatter(content)
   // Follow the incoming document's Markdown style before it is parsed, so a
   // save writes the same markers the file already used.
-  const detectedStyle = detectMarkdownStyle(content)
+  const detectedStyle = detectMarkdownStyle(body)
   applyMarkdownStyle(detectedStyle)
-  if (content.length >= LARGE_DOCUMENT_SOURCE_THRESHOLD) {
+  if (body.length >= LARGE_DOCUMENT_SOURCE_THRESHOLD) {
     // ProseMirror renders the whole document eagerly. Keep very large files in
     // the existing source editor so opening them stays responsive on Windows.
-    enterSourceMode(content)
-    updateWordCount(content)
+    enterSourceMode(body)
+    updateWordCount(body)
     return
   }
   exitSourceMode()
-  setMarkdownProgrammatically(content, flushHistory)
-  updateWordCount(content)
+  setMarkdownProgrammatically(body, flushHistory)
+  updateWordCount(body)
 }
 
 function getContent(): string {
   if (sourceModeActive) return sourceEl().value
   return getMarkdown()
+}
+
+// What belongs in the file: the properties block untouched, then the document
+// in the line endings the file already used.
+function getFileContent(): string {
+  const body = getContent()
+  return activeFrontmatter + (activeLineEnding === '\r\n' ? body.replace(/\r?\n/g, '\r\n') : body)
 }
 
 function getExportSnapshot(content: string): {
@@ -1463,7 +1504,7 @@ async function init(): Promise<void> {
     // background tab can never be dropped silently.
     window.electronAPI.respondDocumentState(requestId, {
       dirty,
-      content: getContent(),
+      content: getFileContent(),
       tabs: tabs.filter((tab) => tab.dirty).map((tab) => ({ path: tab.filePath, content: tab.content }))
     })
   })
@@ -1596,12 +1637,13 @@ async function init(): Promise<void> {
       raiseExternalConflict()
       return
     }
+    const body = takeFrontmatter(content)
     if (sourceModeActive) {
-      sourceEl().value = content
+      sourceEl().value = body
     } else {
       // An external write is not something the reader can undo into; making it
       // one undo step would also let a stray undo write stale content back.
-      setMarkdownProgrammatically(content, true)
+      setMarkdownProgrammatically(body, true)
     }
     updateSourceToggle()
     updateWordCount()
