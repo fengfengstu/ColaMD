@@ -29,8 +29,9 @@ const themesDir = join(app.getPath('home'), '.colamd', 'themes')
 const releaseNoticePath = join(app.getPath('userData'), 'release-notice.json')
 
 // The shell's top row, in CSS pixels: the window controls overlay on Windows has
-// to be told the same height the renderer draws (design.md, one row).
-const TITLEBAR_HEIGHT = 40
+// to be told the same height the renderer draws (design.md, one row). Must match
+// --chrome-row-height in base.css and the pre-load guard in index.html.
+const TITLEBAR_HEIGHT = 36
 // What the overlay shows before the renderer reports its theme. The app's theme is
 // independent of the system's, so this can only be a guess: follow the system, and
 // the renderer corrects it on first paint (a wrong guess would otherwise flash a
@@ -351,7 +352,11 @@ function createWindow(filePath?: string, initialContent?: string, initialBrowseP
     ...(isWindows
       ? { titleBarOverlay: { ...(nativeTheme.shouldUseDarkColors ? { color: darkOverlay.bg, symbolColor: darkOverlay.symbol } : { color: lightOverlay.bg, symbolColor: lightOverlay.symbol }), height: TITLEBAR_HEIGHT } }
       : {}),
-    trafficLightPosition: { x: 16, y: 14 },
+    // macOS centres the traffic lights in the row: the button frame is 14px tall
+    // with the 12px circle inside it, so the circle's centre sits at y + 8. For a
+    // 36px row that is 18 = half the row, i.e. y = 10 (measured against Finder:
+    // its 52px toolbar puts them at 26, exactly half).
+    trafficLightPosition: { x: 16, y: TITLEBAR_HEIGHT / 2 - 8 },
     // Windows only: the menu bar is the second of the three bars, so it starts
     // hidden and Alt still reveals it the way Windows users expect. The row gets
     // its own menu button, which pops the same menu.

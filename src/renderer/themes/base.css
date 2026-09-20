@@ -13,8 +13,15 @@ html, body {
 }
 
 :root {
-  /* Zero: the strip lives inside the 40px titlebar row, so the editor starts
-     right below it and nothing below needs a second offset. */
+  /* The single top row's height, in one place: the row itself, the editor and
+     the panel all sit on this number, and the main process's TITLEBAR_HEIGHT
+     (which Windows uses for the system buttons) has to agree with it. Shorter
+     rows make the chrome lighter, but 28px controls need air around them, and
+     the macOS traffic lights are centred against it (trafficLightPosition.y =
+     rowHeight / 2 - 8). */
+  --chrome-row-height: 36px;
+  /* Zero: the strip lives inside the top row, so the editor starts right below
+     it and nothing below needs a second offset. */
   --tab-bar-height: 0px;
   --editor-top-gap: 0px;
 }
@@ -58,7 +65,7 @@ body {
      baseline, the wrong colour and the dead buttons all came from that split.)
      Left padding clears the macOS traffic lights. */
   -webkit-app-region: drag;
-  height: 40px;
+  height: var(--chrome-row-height);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -427,18 +434,19 @@ body.platform-win #titlebar {
 
 #editor {
   position: relative; /* anchor for the absolutely-positioned code copy button */
-  height: calc(100vh - 40px - var(--tab-bar-height, 0px));
+  height: calc(100vh - var(--chrome-row-height) - var(--tab-bar-height, 0px));
   overflow-y: auto;
   /* 40px of air above the first line, the same as below it and at the sides, and
      the same as the source view's: a document that starts flush against the
      chrome reads as if it were scrolled, and switching modes must not make the
-     text jump (2026-09-15). */
+     text jump (2026-09-15). This 40 is the document's breathing room, NOT the
+     top row's height, and the two must not be changed as one. */
   padding: calc(40px + var(--editor-top-gap, 0px)) 40px 40px;
 }
 
 #source-editor {
   display: none;
-  height: calc(100vh - 40px - var(--tab-bar-height, 0px));
+  height: calc(100vh - var(--chrome-row-height) - var(--tab-bar-height, 0px));
   width: 100%;
   /* Center a column matching the visual editor (780px) so switching modes
      keeps the text in the same place (#48). Falls back to 40px on narrow windows. */
@@ -462,7 +470,7 @@ body.platform-win #titlebar {
 /* Same-directory file panel */
 #file-panel {
   position: fixed;
-  top: calc(40px + var(--tab-bar-height, 0px));
+  top: calc(var(--chrome-row-height) + var(--tab-bar-height, 0px));
   right: 0;
   bottom: 0;
   width: var(--file-panel-width, 220px);
@@ -494,7 +502,7 @@ body.platform-win #titlebar {
    this is shell furniture. */
 #panel-resizer {
   position: fixed;
-  top: calc(40px + var(--tab-bar-height, 0px));
+  top: calc(var(--chrome-row-height) + var(--tab-bar-height, 0px));
   bottom: 0;
   right: calc(var(--file-panel-width, 220px) - 4px);
   width: 7px;
